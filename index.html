@@ -109,7 +109,7 @@ body:before{content:"";position:fixed;inset:0;pointer-events:none;opacity:.5;bac
 
       <div class="ocr-panel" id="ocrPanel">
         <div class="ocr-head">
-          <div><div class="ocr-title">📷 가속권 스크린샷 자동 인식 <span class="badge">V0.6 BETA</span></div><div class="ocr-sub">공용 · 건설 · 연구 · 훈련 · 치료 가속권을 종류/시간별로 인식해 계산기에 자동 입력합니다.</div></div>
+          <div><div class="ocr-title">📷 가속권 스크린샷 자동 인식 <span class="badge">V0.7 BETA</span></div><div class="ocr-sub">공용 · 건설 · 연구 · 훈련 · 치료 가속권을 종류/시간별로 인식해 계산기에 자동 입력합니다.</div></div>
           <div id="ocrStatus" class="ocr-status">준비됨</div>
         </div>
         <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="가속권 스크린샷 선택">
@@ -383,162 +383,138 @@ const SPEEDUP_CATS = [
 const DURATION_OPTIONS = [
   ['1분',1],['5분',5],['10분',10],['15분',15],['30분',30],['1시간',60],['3시간',180],['8시간',480],['24시간',1440],['1일',1440]
 ];
-// V0.5: full-screen dynamic card detection. No fixed row/column count.
-let ocrFiles=[],ocrRows=[],ocrWorkers={kor:null,eng:null,korSparse:null,engSparse:null},ocrTesseractLoading=false,ocrBusy=false;
-function formatMinutes(min){min=Math.max(0,Math.round(min));const d=Math.floor(min/1440);min%=1440;const h=Math.floor(min/60);const m=min%60;const out=[];if(d)out.push(d+'일');if(h)out.push(h+'시간');if(m)out.push(m+'분');if(!out.length)out.push('0분');return out.join(' ');}
-function speedupDurationMinutes(label){return (DURATION_OPTIONS.find(x=>x[0]===label)||[label,1])[1];}
-function durationFromText(s){
-  const t=String(s||'').replace(/\s+/g,'').replace(/O/gi,'0').replace(/I/g,'1').replace(/l/g,'1');
-  let m=t.match(/(\d+)일/);if(m)return{label:m[1]+'일',minutes:Number(m[1])*1440};
-  m=t.match(/(\d+)시간/);if(m)return{label:m[1]+'시간',minutes:Number(m[1])*60};
-  m=t.match(/(\d+)분/);if(m)return{label:m[1]+'분',minutes:Number(m[1])};
+// V0.7 OCR engine: detect card rectangles first, then OCR only each card.
+// No fixed row/column count. Unrecognized fields remain editable instead of disappearing.
+let ocrFiles=[],ocrRows=[],ocrWorkers={kor:null,eng:null},ocrTesseractLoading=false,ocrBusy=false;
+
+function formatMinutes(min){min=Math.max(0,Math.round(Number(min)||0));const d=Math.floor(min/1440);min%=1440;const h=Math.floor(min/60);const m=min%60;const out=[];if(d)out.push(d+'일');if(h)out.push(h+'시간');if(m)out.push(m+'분');if(!out.length)out.push('0분');return out.join(' ');}
+function speedupDurationMinutes(label){return (DURATION_OPTIONS.find(x=>x[0]===label)||[label,0])[1];}
+function normalizeOcrText(s){return String(s||'').replace(/[\n\r]/g,' ').replace(/\s+/g,'').replace(/O/gi,'0').replace(/I/g,'1').replace(/l/g,'1').trim();}
+function durationFromTextLoose(s){
+  const t=normalizeOcrText(s);
+  if(!t)return null;
+  let m=t.match(/(\d+)\s*(분|분|문|본|븐)/);if(m){const n=Number(m[1]);if([1,5,10,15,30].includes(n))return{label:n+'분',minutes:n};}
+  m=t.match(/(\d+)\s*(시간|시|간|기|선|간시)/);if(m){const n=Number(m[1]);if([1,3,8,24].includes(n)){if(n===24)return{label:'24시간',minutes:1440};return{label:n+'시간',minutes:n*60};}}
+  if(/1.?분/.test(t))return{label:'1분',minutes:1};
+  if(/5.?분/.test(t))return{label:'5분',minutes:5};
+  if(/1.?시간/.test(t))return{label:'1시간',minutes:60};
+  if(/3.?시간/.test(t))return{label:'3시간',minutes:180};
+  if(/8.?시간/.test(t))return{label:'8시간',minutes:480};
+  if(/24.?시간/.test(t))return{label:'24시간',minutes:1440};
   return null;
 }
 function setOCRStatus(t){const e=$('ocrStatus');if(e)e.textContent=t;}
 function updateOCRButtons(){ $('ocrAnalyze').disabled=ocrBusy||!ocrFiles.length; $('ocrApply').disabled=ocrBusy||!ocrRows.length; $('ocrClear').disabled=ocrBusy; $('speedupPick').disabled=ocrBusy; }
 function renderOCRPreview(){const box=$('ocrPreview');box.innerHTML='';ocrFiles.forEach((f,i)=>{const url=URL.createObjectURL(f),d=document.createElement('div');d.className='ocr-thumb';d.innerHTML=`<img alt="스크린샷 ${i+1}"><span>${i+1}. ${escapeHtml(f.name).slice(0,18)}</span>`;box.appendChild(d);d.querySelector('img').src=url;setTimeout(()=>URL.revokeObjectURL(url),60000);});}
-function setOCRFiles(files){
-  ocrFiles=[...files].filter(f=>f && f.type && f.type.startsWith('image/'));
-  ocrRows=[];
-  renderOCRPreview();
-  renderOCRRows();
-  updateOCRButtons();
-  if(ocrFiles.length){setOCRStatus(`${ocrFiles.length}장 첨부됨 · 분석할 준비 완료`);}else{setOCRStatus('이미지를 선택해주세요');}
-}
-function totalByCat(cat){return ocrRows.filter(r=>r.cat===cat).reduce((s,r)=>s+r.minutes*r.count,0);}
+function setOCRFiles(files){ocrFiles=[...files].filter(f=>f&&f.type&&f.type.startsWith('image/'));ocrRows=[];renderOCRPreview();renderOCRRows();updateOCRButtons();setOCRStatus(ocrFiles.length?`${ocrFiles.length}장 첨부됨 · 분석할 준비 완료`:'이미지를 선택해주세요');}
+function totalByCat(cat){return ocrRows.filter(r=>r.cat===cat&&r.minutes>0&&r.count>0).reduce((s,r)=>s+r.minutes*r.count,0);}
 function renderOCRSummary(){const g=totalByCat('general'),c=totalByCat('construction');$('ocrCardCount').textContent=ocrRows.length+'개';$('ocrGeneralTotal').textContent=formatMinutes(g);$('ocrConstructionTotal').textContent=formatMinutes(c);$('ocrBuildUsable').textContent=formatMinutes(g+c);}
+function durationOptionsHtml(selected){let html='';if(!selected||selected==='__unknown__')html+='<option value="__unknown__" selected>인식 필요</option>';for(const [l,m] of DURATION_OPTIONS){html+=`<option value="${l}" ${selected===l?'selected':''}>${l}</option>`;}return html;}
+function categoryOptionsHtml(selected){let html='';if(!selected||selected==='unknown')html+='<option value="unknown" selected>미분류</option>';for(const [k,l] of SPEEDUP_CATS){html+=`<option value="${k}" ${selected===k?'selected':''}>${l}</option>`;}return html;}
 function renderOCRRows(){
-  const body=$('ocrTableBody');if(!ocrRows.length){$('ocrResults').hidden=true;updateOCRButtons();return;}$('ocrResults').hidden=false;body.innerHTML='';
-  ocrRows.forEach((r,i)=>{const tr=document.createElement('tr');tr.innerHTML=`<td data-label="분류"><select class="ocr-edit" data-i="${i}" data-k="cat">${SPEEDUP_CATS.map(([k,l])=>`<option value="${k}" ${r.cat===k?'selected':''}>${l}</option>`).join('')}</select></td><td data-label="시간"><select class="ocr-edit" data-i="${i}" data-k="duration">${DURATION_OPTIONS.map(([l,m])=>`<option value="${l}" ${r.label===l?'selected':''}>${l}</option>`).join('')}</select></td><td data-label="수량"><input class="ocr-edit" type="number" min="0" step="1" data-i="${i}" data-k="count" value="${r.count}"></td><td data-label="환산">${formatMinutes(r.minutes*r.count)}</td><td data-label="신뢰도"><span class="ocr-confidence ${r.confidence>=.65?'conf-good':'conf-check'}">${Math.round(r.confidence*100)}%${r.confidence<.65?' · 확인':''}</span></td>`;body.appendChild(tr);});
-  body.querySelectorAll('[data-i]').forEach(el=>el.addEventListener('change',e=>{const i=+e.target.dataset.i,k=e.target.dataset.k,r=ocrRows[i];if(k==='cat')r.cat=e.target.value;else if(k==='duration'){r.label=e.target.value;r.minutes=speedupDurationMinutes(r.label);}else if(k==='count')r.count=Math.max(0,Math.floor(Number(e.target.value)||0));renderOCRRows();}));
+  const body=$('ocrTableBody');
+  if(!ocrRows.length){$('ocrResults').hidden=true;updateOCRButtons();return;}
+  $('ocrResults').hidden=false;body.innerHTML='';
+  ocrRows.forEach((r,i)=>{
+    const tr=document.createElement('tr');
+    const minutesText=r.minutes>0&&r.count>0?formatMinutes(r.minutes*r.count):'인식 필요';
+    const conf=Math.round(Math.max(0,Math.min(1,r.confidence||0))*100);
+    tr.innerHTML=`<td data-label="분류"><select class="ocr-edit" data-i="${i}" data-k="cat">${categoryOptionsHtml(r.cat)}</select></td><td data-label="시간"><select class="ocr-edit" data-i="${i}" data-k="duration">${durationOptionsHtml(r.label)}</select></td><td data-label="수량"><input class="ocr-edit" type="number" min="0" step="1" data-i="${i}" data-k="count" value="${r.count>0?r.count:''}" placeholder="인식 필요"></td><td data-label="환산">${minutesText}</td><td data-label="신뢰도"><span class="ocr-confidence ${conf>=70?'conf-good':'conf-check'}">${conf}%${conf<70?' · 확인 필요':''}</span></td>`;
+    body.appendChild(tr);
+  });
+  body.querySelectorAll('[data-i]').forEach(el=>el.addEventListener('change',e=>{
+    const i=+e.target.dataset.i,k=e.target.dataset.k,r=ocrRows[i];
+    if(k==='cat')r.cat=e.target.value;
+    else if(k==='duration'){r.label=e.target.value;r.minutes=speedupDurationMinutes(r.label);if(r.label==='__unknown__')r.minutes=0;}
+    else if(k==='count'){const n=Number(e.target.value);r.count=Number.isFinite(n)?Math.max(0,Math.floor(n)):0;}
+    renderOCRRows();
+  }));
   renderOCRSummary();updateOCRButtons();
 }
 function makeCanvas(src,x,y,w,h,scale=3){const c=document.createElement('canvas');c.width=Math.max(16,Math.round(w*scale));c.height=Math.max(16,Math.round(h*scale));const ctx=c.getContext('2d');ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.drawImage(src,x,y,w,h,0,0,c.width,c.height);return c;}
-function binarizeCanvas(src,threshold=175){const out=document.createElement('canvas');out.width=src.width;out.height=src.height;const ictx=src.getContext('2d'),octx=out.getContext('2d');const d=ictx.getImageData(0,0,src.width,src.height),p=d.data;for(let i=0;i<p.length;i+=4){const g=.299*p[i]+.587*p[i+1]+.114*p[i+2];const v=g>=threshold?255:0;p[i]=p[i+1]=p[i+2]=v;p[i+3]=255;}octx.putImageData(d,0,0);return out;}
+function grayFromCanvas(c){const ctx=c.getContext('2d'),d=ctx.getImageData(0,0,c.width,c.height),g=new Uint8Array(c.width*c.height);for(let i=0,j=0;i<d.data.length;i+=4,j++)g[j]=Math.round(.299*d.data[i]+.587*d.data[i+1]+.114*d.data[i+2]);return{data:g,w:c.width,h:c.height};}
+function binarizeImageCanvas(c,threshold=185){const g=grayFromCanvas(c);const o=document.createElement('canvas');o.width=g.w;o.height=g.h;const ctx=o.getContext('2d'),out=ctx.createImageData(g.w,g.h);for(let i=0;i<g.data.length;i++){const v=g.data[i]>=threshold?255:0;out.data[i*4]=out.data[i*4+1]=out.data[i*4+2]=v;out.data[i*4+3]=255;}ctx.putImageData(out,0,0);return o;}
 async function loadImage(file){const url=URL.createObjectURL(file);try{const img=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=url;});const maxW=2200,scale=Math.min(1,maxW/img.naturalWidth),c=document.createElement('canvas');c.width=Math.round(img.naturalWidth*scale);c.height=Math.round(img.naturalHeight*scale);c.getContext('2d').drawImage(img,0,0,c.width,c.height);return c;}finally{URL.revokeObjectURL(url);}}
-async function loadTesseract(){
-  if(window.Tesseract)return window.Tesseract;if(ocrTesseractLoading){while(ocrTesseractLoading&&!window.Tesseract)await new Promise(r=>setTimeout(r,100));return window.Tesseract;}
-  ocrTesseractLoading=true;try{await new Promise((resolve,reject)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';s.onload=resolve;s.onerror=()=>reject(new Error('OCR 라이브러리를 불러오지 못했습니다. 인터넷 연결을 확인하세요.'));document.head.appendChild(s);});return window.Tesseract;}finally{ocrTesseractLoading=false;}
+async function loadTesseract(){if(window.Tesseract)return window.Tesseract;if(ocrTesseractLoading){while(ocrTesseractLoading&&!window.Tesseract)await new Promise(r=>setTimeout(r,100));return window.Tesseract;}ocrTesseractLoading=true;try{await new Promise((resolve,reject)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';s.onload=resolve;s.onerror=()=>reject(new Error('OCR 라이브러리를 불러오지 못했습니다. 인터넷 연결을 확인하세요.'));document.head.appendChild(s);});return window.Tesseract;}finally{ocrTesseractLoading=false;}}
+async function getWorker(lang){if(ocrWorkers[lang])return ocrWorkers[lang];const T=await loadTesseract();ocrWorkers[lang]=await T.createWorker(lang,1,{logger:m=>{if(m?.status&&m.progress!=null&&ocrBusy)setOCRStatus(`${m.status} ${Math.round(m.progress*100)}%`);}});if(lang==='eng')await ocrWorkers[lang].setParameters({tessedit_char_whitelist:'0123456789,',tessedit_pageseg_mode:'7'});else await ocrWorkers[lang].setParameters({tessedit_pageseg_mode:'7'});return ocrWorkers[lang];}
+function uniqueSortedBoxes(boxes){boxes.sort((a,b)=>a.y-b.y||a.x-b.x);const out=[];for(const b of boxes){let dup=false;for(const o of out){const ox=Math.abs((b.x+b.w/2)-(o.x+o.w/2)),oy=Math.abs((b.y+b.h/2)-(o.y+o.h/2));const lim=Math.max(12,Math.min(b.w,o.w)*.35);if(ox<lim&&oy<lim){dup=true;if(b.w*b.h>o.w*o.h)Object.assign(o,b);break;}}if(!dup)out.push(b);}return out;}
+function detectCardBoxes(src){
+  const dw=Math.min(900,src.width),scale=dw/src.width,dh=Math.round(src.height*scale);
+  const dc=document.createElement('canvas');dc.width=dw;dc.height=dh;dc.getContext('2d').drawImage(src,0,0,dw,dh);
+  const g=grayFromCanvas(dc), edge=new Uint8Array(dw*dh);
+  for(let y=1;y<dh-1;y++)for(let x=1;x<dw-1;x++){const i=y*dw+x;const gx=Math.abs(g.data[i+1]-g.data[i-1]);const gy=Math.abs(g.data[i+dw]-g.data[i-dw]);if(gx+gy>62)edge[i]=1;}
+  const dil=new Uint8Array(edge.length);
+  for(let y=1;y<dh-1;y++)for(let x=1;x<dw-1;x++){const i=y*dw+x;if(!edge[i])continue;for(let yy=-1;yy<=1;yy++)for(let xx=-1;xx<=1;xx++)dil[(y+yy)*dw+(x+xx)]=1;}
+  const seen=new Uint8Array(dil.length),boxes=[];
+  const minW=dw*.10,maxW=dw*.28,minH=Math.max(95,dh*.055),maxH=Math.min(dh*.18,dw*.28);
+  for(let sy=0;sy<dh;sy++)for(let sx=0;sx<dw;sx++){const si=sy*dw+sx;if(!dil[si]||seen[si])continue;let q=[si],qi=0;seen[si]=1;let minx=sx,maxx=sx,miny=sy,maxy=sy,count=0;while(qi<q.length){const v=q[qi++],y=Math.floor(v/dw),x=v-y*dw;count++;if(x<minx)minx=x;if(x>maxx)maxx=x;if(y<miny)miny=y;if(y>maxy)maxy=y;for(let yy=-1;yy<=1;yy++)for(let xx=-1;xx<=1;xx++){const nx=x+xx,ny=y+yy;if(nx<0||ny<0||nx>=dw||ny>=dh)continue;const ni=ny*dw+nx;if(dil[ni]&&!seen[ni]){seen[ni]=1;q.push(ni);}}}
+    const w=maxx-minx+1,h=maxy-miny+1,aspect=w/h,area=w*h;
+    if(w>=minW&&w<=maxW&&h>=minH&&h<=maxH&&aspect>=.70&&aspect<=1.30&&count>Math.max(100,area*.15)){boxes.push({x:Math.round(minx/scale),y:Math.round(miny/scale),w:Math.round(w/scale),h:Math.round(h/scale)});}
+  }
+  return uniqueSortedBoxes(boxes);
 }
-async function getWorker(lang){if(ocrWorkers[lang])return ocrWorkers[lang];const T=await loadTesseract();ocrWorkers[lang]=await T.createWorker(lang,1,{logger:m=>{if(m?.status&&m.progress!=null)setOCRStatus(`${m.status} ${Math.round(m.progress*100)}%`);}});if(lang==='eng')await ocrWorkers[lang].setParameters({tessedit_char_whitelist:'0123456789,',tessedit_pageseg_mode:'7'});else await ocrWorkers[lang].setParameters({tessedit_pageseg_mode:'7'});return ocrWorkers[lang];}
-async function getSparseWorker(lang){const key=lang+'Sparse';if(ocrWorkers[key])return ocrWorkers[key];const T=await loadTesseract();ocrWorkers[key]=await T.createWorker(lang,1,{logger:m=>{if(m?.status&&m.progress!=null)setOCRStatus(`${m.status} ${Math.round(m.progress*100)}%`);}});if(lang==='eng')await ocrWorkers[key].setParameters({tessedit_char_whitelist:'0123456789,',tessedit_pageseg_mode:'11'});else await ocrWorkers[key].setParameters({tessedit_pageseg_mode:'11'});return ocrWorkers[key];}
-const templateData={};
-async function loadTemplate(name,source){if(templateData[name])return templateData[name];const img=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=source;});const c=document.createElement('canvas');c.width=64;c.height=64;c.getContext('2d').drawImage(img,0,0,64,64);const d=c.getContext('2d').getImageData(0,0,64,64).data;templateData[name]=d;return d;}
-function normGray(data){let a=[];for(let i=0;i<data.length;i+=4)a.push(.299*data[i]+.587*data[i+1]+.114*data[i+2]);const mean=a.reduce((s,v)=>s+v,0)/a.length;let sd=Math.sqrt(a.reduce((s,v)=>s+(v-mean)*(v-mean),0)/a.length)||1;return a.map(v=>(v-mean)/sd);}
-function signatureFromCanvas(canvas){const c=document.createElement('canvas');c.width=64;c.height=64;c.getContext('2d').drawImage(canvas,0,0,64,64);return normGray(c.getContext('2d').getImageData(0,0,64,64).data);}
-async function similarity(canvas,template,key){const a=signatureFromCanvas(canvas),b=normGray(await loadTemplate(key,template));return a.reduce((s,v,i)=>s+Math.abs(v-b[i]),0)/a.length;}
+function cardDurationTemplateSignature(tile){const c=makeCanvas(tile,tile.width*.20,tile.height*.00,tile.width*.70,tile.height*.30,2);const g=grayFromCanvas(c);const out=new Float32Array(90*40);const tmp=document.createElement('canvas');tmp.width=90;tmp.height=40;tmp.getContext('2d').drawImage(c,0,0,90,40);const d=tmp.getContext('2d').getImageData(0,0,90,40).data;let sum=0;for(let i=0;i<d.length;i+=4)sum+=.299*d[i]+.587*d[i+1]+.114*d[i+2];const mean=sum/(90*40);let sd=0;for(let i=0,j=0;i<d.length;i+=4,j++){const v=.299*d[i]+.587*d[i+1]+.114*d[i+2];sd+=(v-mean)*(v-mean);out[j]=v;}sd=Math.sqrt(sd/(90*40))||1;for(let i=0;i<out.length;i++)out[i]=(out[i]-mean)/sd;return out;}
+function sigDistance(a,b){let s=0;for(let i=0;i<a.length;i++)s+=Math.abs(a[i]-b[i]);return s/a.length;}
+const durationTemplates={};
+function durationTemplateScore(tile,label){if(!durationTemplates[label])return 999;return sigDistance(cardDurationTemplateSignature(tile),durationTemplates[label]);}
+function learnDurationTemplates(){
+  // Templates are intentionally empty by default. OCR remains the primary method.
+  // Once enough real samples are available, these can be filled without changing the detection engine.
+}
+function parseCountCandidates(text){const raw=String(text||'').replace(/[^0-9,]/g,' ');const arr=[];for(const part of raw.split(/\s+/)){if(!part)continue;const compact=part.replace(/,/g,'');if(/^\d+$/.test(compact)){const n=Number(compact);if(Number.isSafeInteger(n)&&n>=0)arr.push(n);}}return arr;}
+async function recognizeCount(worker,c){
+  const variants=[c,binarizeImageCanvas(c,175),binarizeImageCanvas(c,195),binarizeImageCanvas(c,210)];let best=null;
+  for(const img of variants){const r=await worker.recognize(img);const cand=parseCountCandidates(r.data?.text||'');const conf=Number(r.data?.confidence||0);for(const n of cand){if(n<0)continue;const digitLen=String(n).length;let score=conf+(digitLen>=1&&digitLen<=6?4:0)+(String(r.data?.text||'').includes(',')?3:0);if(best==null||score>best.score)best={n,score,conf};}}
+  return best?{count:best.n,confidence:Math.max(.05,Math.min(.99,best.conf/100))}:null;
+}
+async function recognizeDuration(worker,c){
+  const variants=[c,binarizeImageCanvas(c,170),binarizeImageCanvas(c,190),binarizeImageCanvas(c,210)];let best=null;
+  for(const img of variants){const r=await worker.recognize(img);const text=r.data?.text||'';const d=durationFromTextLoose(text);if(d){const conf=Number(r.data?.confidence||0);if(!best||conf>best.conf)best={...d,confidence:Math.max(.05,Math.min(.99,conf/100)),raw:text};}}
+  return best;
+}
 async function classifyCategory(tile){
-  const patch=makeCanvas(tile,0,tile.height*.50,tile.width*.50,tile.height*.50,1);const scores=[];
-  for(const [key] of SPEEDUP_CATS)scores.push([key,await similarity(patch,OCR_CATEGORY_TEMPLATES[key],'cat_'+key)]);scores.sort((a,b)=>a[1]-b[1]);const best=scores[0],second=scores[1]||[best[0],best[1]+1];return{cat:best[0],confidence:Math.max(.08,Math.min(.98,1-best[1]/(second[1]+.0001)))};
+  try{
+    const patch=makeCanvas(tile,0,tile.height*.50,tile.width*.50,tile.height*.50,1);const scores=[];
+    for(const [key] of SPEEDUP_CATS){scores.push([key,await similarity(patch,OCR_CATEGORY_TEMPLATES[key],'cat_'+key)]);}
+    scores.sort((a,b)=>a[1]-b[1]);const best=scores[0],second=scores[1]||[best[0],best[1]+1];return{cat:best[0],confidence:Math.max(.08,Math.min(.98,1-best[1]/(second[1]+.0001)))};
+  }catch{return{cat:'unknown',confidence:.15};}
 }
-function normalizeOcrText(s){return String(s||'').replace(/[\n\r]/g,' ').replace(/\s+/g,'').replace(/O/g,'0').replace(/I/g,'1').replace(/l/g,'1').trim();}
-function parseDurationLoose(s){const t=normalizeOcrText(s);return durationFromText(t)||null;}
-function wordBox(w){const b=w?.bbox||{};return{left:Number(b.x0||0),top:Number(b.y0||0),right:Number(b.x1||0),bottom:Number(b.y1||0),cx:(Number(b.x0||0)+Number(b.x1||0))/2,cy:(Number(b.y0||0)+Number(b.y1||0))/2};}
-function collectDurationAnchors(words,width,height){
-  const clean=words.map((w,i)=>({...w,idx:i,text:normalizeOcrText(w.text),box:wordBox(w)})).filter(w=>w.text);
-  const anchors=[];
-  for(const w of clean){const d=parseDurationLoose(w.text);if(d)anchors.push({text:w.text,label:d.label,minutes:d.minutes,box:w.box,confidence:(Number(w.confidence||0)/100)||.3});}
-  // OCR may split "1" and "시간". Join close words on the same line.
-  for(let i=0;i<clean.length;i++)for(let j=i+1;j<clean.length;j++){
-    const a=clean[i],b=clean[j];
-    if(b.box.cx<a.box.cx)continue;
-    const sameLine=Math.abs(a.box.cy-b.box.cy)<Math.max(18,height*.025);
-    const close=b.box.left-a.box.right<Math.max(42,width*.07);
-    if(!sameLine||!close)continue;
-    const joined=parseDurationLoose(a.text+b.text);if(!joined)continue;
-    const box={left:Math.min(a.box.left,b.box.left),top:Math.min(a.box.top,b.box.top),right:Math.max(a.box.right,b.box.right),bottom:Math.max(a.box.bottom,b.box.bottom)};box.cx=(box.left+box.right)/2;box.cy=(box.top+box.bottom)/2;
-    anchors.push({text:a.text+' '+b.text,label:joined.label,minutes:joined.minutes,box,confidence:Math.min(1,((Number(a.confidence||0)+Number(b.confidence||0))/200)||.35)});
+async function analyzeOneScreenshot(src,fileName,index){
+  const boxes=detectCardBoxes(src);if(!boxes.length)return{rows:[],detected:0};
+  const [kw,ew]=await Promise.all([getWorker('kor'),getWorker('eng')]);const rows=[];
+  for(let i=0;i<boxes.length;i++){
+    const b=boxes[i];setOCRStatus(`이미지 ${index+1} · 카드 ${i+1}/${boxes.length} 분석 중…`);
+    const tile=makeCanvas(src,Math.max(0,b.x-1),Math.max(0,b.y-1),Math.min(b.w+2,src.width-Math.max(0,b.x-1)),Math.min(b.h+2,src.height-Math.max(0,b.y-1)),1);
+    const durCrop=makeCanvas(tile,tile.width*.20,tile.height*.00,tile.width*.70,tile.height*.30,3);
+    const cntCrop=makeCanvas(tile,tile.width*.45,tile.height*.64,tile.width*.55,tile.height*.34,4);
+    const [dur,cnt,cat]=await Promise.all([recognizeDuration(kw,durCrop),recognizeCount(ew,cntCrop),classifyCategory(tile)]);
+    rows.push({cat:cat.cat,label:dur?.label||'__unknown__',minutes:dur?.minutes||0,count:cnt?.count||0,confidence:Math.max(.05,Math.min(.99,(dur?.confidence||.15)*.35+(cnt?.confidence||.15)*.45+(cat?.confidence||.15)*.20)),source:fileName,rawDuration:dur?.raw||'',box:b});
   }
-  // De-duplicate overlapping anchors.
-  anchors.sort((a,b)=>a.box.top-b.box.top||a.box.left-b.box.left);const out=[];
-  for(const a of anchors){let dup=false;for(const o of out){const ix=Math.max(0,Math.min(a.box.right,o.box.right)-Math.max(a.box.left,o.box.left));const iy=Math.max(0,Math.min(a.box.bottom,o.box.bottom)-Math.max(a.box.top,o.box.top));const ia=ix*iy,aa=Math.max(1,(a.box.right-a.box.left)*(a.box.bottom-a.box.top)),oa=Math.max(1,(o.box.right-o.box.left)*(o.box.bottom-o.box.top));if(ia/Math.min(aa,oa)>.45){dup=true;if(a.confidence>o.confidence){Object.assign(o,a);}break;}}if(!dup)out.push(a);}
-  return out;
-}
-function inferCardGeometry(anchors,width,height){
-  const dx=[],dy=[];
-  for(let i=0;i<anchors.length;i++){
-    const a=anchors[i];let bestX=Infinity,bestY=Infinity;
-    for(let j=0;j<anchors.length;j++)if(i!==j){const b=anchors[j];const ax=Math.abs(a.box.cx-b.box.cx),ay=Math.abs(a.box.cy-b.box.cy);if(ay<height*.035&&ax>width*.035)bestX=Math.min(bestX,ax);if(ax<width*.045&&ay>height*.035)bestY=Math.min(bestY,ay);}
-    if(isFinite(bestX))dx.push(bestX);if(isFinite(bestY))dy.push(bestY);
-  }
-  const med=(arr,fallback)=>{if(!arr.length)return fallback;arr.sort((a,b)=>a-b);return arr[Math.floor(arr.length/2)];};
-  const cardW=Math.max(90,Math.min(width*.32,med(dx,width*.20)*.90));
-  const cardH=Math.max(90,Math.min(height*.22,med(dy,cardW*.98)*.92));
-  return{cardW,cardH};
-}
-function parseNumericToken(s){const t=normalizeOcrText(s).replace(/[^0-9,]/g,'');if(!t)return null;const n=Number(t.replace(/,/g,''));return Number.isFinite(n)?Math.floor(n):null;}
-function mergeNumericWords(words,width,height){
-  const nums=words.map((w,i)=>({idx:i,n:parseNumericToken(w.text),box:wordBox(w),conf:Number(w.confidence||0)/100})).filter(x=>x.n!==null&&x.n>=1);
-  nums.sort((a,b)=>a.box.top-b.box.top||a.box.left-b.box.left);
-  const out=[],used=new Set();
-  for(let i=0;i<nums.length;i++){if(used.has(i))continue;let cur=nums[i],text=String(cur.n),j=i+1;while(j<nums.length){const b=nums[j];const sameLine=Math.abs(cur.box.cy-b.box.cy)<Math.max(18,height*.018);const gap=b.box.left-cur.box.right; if(sameLine&&gap<Math.max(28,width*.035)){const st=String(b.n);text+=st;cur={...cur,n:Number(text),box:{left:Math.min(cur.box.left,b.box.left),top:Math.min(cur.box.top,b.box.top),right:Math.max(cur.box.right,b.box.right),bottom:Math.max(cur.box.bottom,b.box.bottom)},conf:Math.min(cur.conf||.3,b.conf||.3)};used.add(j);j++;}else break;}out.push(cur);used.add(i);}
-  return out;
-}
-function chooseCountForAnchor(anchor,numbers,geom,width,height){
-  const b=anchor.box, expected={x:b.cx+geom.cardW*.22,y:b.top+geom.cardH*.78};
-  const candidates=numbers.filter(n=>{
-    const x=n.box.cx,y=n.box.cy;return x>=b.cx-geom.cardW*.35&&x<=b.cx+geom.cardW*.50&&y>=b.bottom+geom.cardH*.18&&y<=b.top+geom.cardH*1.02;
-  });
-  candidates.sort((a,b2)=>{const da=Math.hypot(a.box.cx-expected.x,a.box.cy-expected.y),db=Math.hypot(b2.box.cx-expected.x,b2.box.cy-expected.y);return da-db;});
-  return candidates[0]||null;
-}
-async function classifyDynamicCard(src,anchor,geom){
-  let x=anchor.box.cx-geom.cardW/2,y=anchor.box.top-geom.cardH*.08;const tile=makeCanvas(src,Math.max(0,x),Math.max(0,y),Math.min(geom.cardW,src.width-Math.max(0,x)),Math.min(geom.cardH,src.height-Math.max(0,y)),1);
-  return classifyCategory(tile);
-}
-async function analyzeOneScreenshot(src,fileName){
-  const kw=await getSparseWorker('kor');const er=await getSparseWorker('eng');
-  setOCRStatus('전체 화면에서 가속권 위치 찾는 중…');
-  const [kr,eng]=await Promise.all([kw.recognize(src),er.recognize(src)]);
-  const kWords=(kr.data?.words||[]).filter(w=>Number(w.confidence||0)>=10);const eWords=(eng.data?.words||[]).filter(w=>Number(w.confidence||0)>=10);
-  const anchors=collectDurationAnchors(kWords,src.width,src.height);
-  if(!anchors.length)return{rows:[],detected:0};
-  const geom=inferCardGeometry(anchors,src.width,src.height);const nums=mergeNumericWords(eWords,src.width,src.height);
-  const rows=[];
-  for(let i=0;i<anchors.length;i++){
-    setOCRStatus(`카드 ${i+1}/${anchors.length} 분석 중…`);const a=anchors[i];const n=chooseCountForAnchor(a,nums,geom,src.width,src.height);if(!n||n.n<=0)continue;
-    const cat=await classifyDynamicCard(src,a,geom);const confidence=Math.min(.99,(a.confidence||.3)*.35+(n.conf||.3)*.45+(cat.confidence||.2)*.20);
-    rows.push({cat:cat.cat,label:a.label,minutes:a.minutes,count:n.n,confidence,source:fileName});
-  }
-  return{rows,detected:anchors.length};
+  return{rows,detected:boxes.length};
 }
 async function analyzeSpeedupScreenshots(){
-  if(!ocrFiles.length||ocrBusy)return;
-  ocrBusy=true;updateOCRButtons();ocrRows=[];renderOCRRows();const files=ocrFiles.slice();let detectedTotal=0;
+  if(!ocrFiles.length||ocrBusy)return;ocrBusy=true;updateOCRButtons();ocrRows=[];renderOCRRows();const files=ocrFiles.slice();let detectedTotal=0;
   try{
-    for(let fi=0;fi<files.length;fi++){
-      setOCRStatus(`${fi+1}/${files.length} 이미지 준비 중…`);const src=await loadImage(files[fi]);const result=await analyzeOneScreenshot(src,files[fi].name);detectedTotal+=result.detected;ocrRows.push(...result.rows);
-    }
-    const map=new Map();for(const r of ocrRows){const key=r.cat+'|'+r.label;const old=map.get(key);if(old){old.count+=r.count;old.confidence=Math.min(old.confidence,r.confidence);}else map.set(key,{...r});}
-    ocrRows=[...map.values()].sort((a,b)=>SPEEDUP_CATS.findIndex(x=>x[0]===a.cat)-SPEEDUP_CATS.findIndex(x=>x[0]===b.cat)||a.minutes-b.minutes);
-    setOCRStatus(`완료 · ${detectedTotal}개 카드 탐지 · ${ocrRows.length}개 항목`);renderOCRRows();
+    for(let fi=0;fi<files.length;fi++){setOCRStatus(`${fi+1}/${files.length} 이미지 준비 중…`);const src=await loadImage(files[fi]);const result=await analyzeOneScreenshot(src,files[fi].name,fi);detectedTotal+=result.detected;ocrRows.push(...result.rows);}
+    // Merge only rows with the same recognized key; unresolved rows stay visible separately.
+    const map=new Map(),unresolved=[];
+    for(const r of ocrRows){if(r.cat==='unknown'||r.label==='__unknown__'||r.minutes<=0||r.count<=0){unresolved.push(r);continue;}const key=r.cat+'|'+r.label;const old=map.get(key);if(old){old.count+=r.count;old.confidence=Math.min(old.confidence,r.confidence);}else map.set(key,{...r});}
+    ocrRows=[...map.values(),...unresolved].sort((a,b)=>SPEEDUP_CATS.findIndex(x=>x[0]===a.cat)-SPEEDUP_CATS.findIndex(x=>x[0]===b.cat)||((a.minutes||999999)-(b.minutes||999999)));
+    const unresolvedCount=ocrRows.filter(r=>r.cat==='unknown'||r.label==='__unknown__'||r.minutes<=0||r.count<=0).length;
+    setOCRStatus(`완료 · ${detectedTotal}개 카드 탐지 · ${ocrRows.length}개 결과${unresolvedCount?` · ${unresolvedCount}개 확인 필요`:''}`);renderOCRRows();
   }finally{ocrBusy=false;updateOCRButtons();}
 }
 function applyOCRToCalculator(){
   if(!ocrRows.length){setOCRStatus('적용할 인식 결과가 없습니다');return;}
-  const g=totalByCat('general'),c=totalByCat('construction');
-  $('generalSpeedup').value=String(Math.round(g));$('constructionSpeedup').value=String(Math.round(c));
-  try{localStorage.setItem('wosSpeedupInventoryV6',JSON.stringify(ocrRows));}catch{}
-  render();
-  setOCRStatus(`적용 완료 · 건물 사용 가능 ${formatMinutes(g+c)}`);
-  const note=document.querySelector('.speedup-total-note');if(note)note.innerHTML=`✅ <strong>자동 입력 완료:</strong> 공용 ${formatMinutes(g)} + 건설 ${formatMinutes(c)} = 건물용 ${formatMinutes(g+c)}`;
+  const g=totalByCat('general'),c=totalByCat('construction');$('generalSpeedup').value=String(Math.round(g));$('constructionSpeedup').value=String(Math.round(c));
+  try{localStorage.setItem('wosSpeedupInventoryV7',JSON.stringify(ocrRows));}catch{}
+  render();setOCRStatus(`적용 완료 · 건물 사용 가능 ${formatMinutes(g+c)}`);const note=document.querySelector('.speedup-total-note');if(note)note.innerHTML=`✅ <strong>자동 입력 완료:</strong> 공용 ${formatMinutes(g)} + 건설 ${formatMinutes(c)} = 건물용 ${formatMinutes(g+c)}`;
 }
-function clearOCR(){
-  ocrFiles=[];ocrRows=[];
-  const input=$('speedupFiles');if(input)input.value='';
-  renderOCRPreview();renderOCRRows();setOCRStatus('준비됨');updateOCRButtons();
-  const note=document.querySelector('.speedup-total-note');if(note)note.textContent='스크린샷을 분석하면 공용/건설 가속권 총량이 위 입력칸에 자동 반영됩니다.';
-}
-$('speedupFiles').addEventListener('change',e=>setOCRFiles(e.target.files));
-$('speedupPick').addEventListener('click',e=>{e.preventDefault();e.stopPropagation();$('speedupFiles').click();});
-$('dropzone').addEventListener('click',e=>{if(!e.target.closest('#speedupPick')&&!ocrBusy)$('speedupFiles').click();});
-$('dropzone').addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&!ocrBusy){e.preventDefault();$('speedupFiles').click();}});
-$('ocrAnalyze').addEventListener('click',async()=>{try{await analyzeSpeedupScreenshots();}catch(err){console.error(err);setOCRStatus('분석 실패');alert('OCR 분석 중 오류가 발생했습니다.\n'+(err?.message||err));}});
-$('ocrApply').addEventListener('click',applyOCRToCalculator);$('ocrClear').addEventListener('click',clearOCR);
-['dragenter','dragover'].forEach(evt=>$('dropzone').addEventListener(evt,e=>{e.preventDefault();$('dropzone').classList.add('drag');}));
-['dragleave','drop'].forEach(evt=>$('dropzone').addEventListener(evt,e=>{e.preventDefault();$('dropzone').classList.remove('drag');}));
-$('dropzone').addEventListener('drop',e=>setOCRFiles(e.dataTransfer.files));
-try{const saved=JSON.parse(localStorage.getItem('wosSpeedupInventoryV6')||'[]');if(Array.isArray(saved)&&saved.length){ocrRows=saved;renderOCRRows();}}catch{}updateOCRButtons();
+function clearOCR(){ocrFiles=[];ocrRows=[];const input=$('speedupFiles');if(input)input.value='';renderOCRPreview();renderOCRRows();setOCRStatus('준비됨');updateOCRButtons();const note=document.querySelector('.speedup-total-note');if(note)note.textContent='스크린샷을 분석하면 공용/건설 가속권 총량이 위 입력칸에 자동 반영됩니다.';}
+$('speedupFiles').addEventListener('change',e=>setOCRFiles(e.target.files));$('speedupPick').addEventListener('click',e=>{e.preventDefault();e.stopPropagation();$('speedupFiles').click();});$('dropzone').addEventListener('click',e=>{if(!e.target.closest('#speedupPick')&&!ocrBusy)$('speedupFiles').click();});$('dropzone').addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&!ocrBusy){e.preventDefault();$('speedupFiles').click();}});
+$('ocrAnalyze').addEventListener('click',async()=>{try{await analyzeSpeedupScreenshots();}catch(err){console.error(err);setOCRStatus('분석 실패');alert('OCR 분석 중 오류가 발생했습니다.\n'+(err?.message||err));}});$('ocrApply').addEventListener('click',applyOCRToCalculator);$('ocrClear').addEventListener('click',clearOCR);
+['dragenter','dragover'].forEach(evt=>$('dropzone').addEventListener(evt,e=>{e.preventDefault();$('dropzone').classList.add('drag');}));['dragleave','drop'].forEach(evt=>$('dropzone').addEventListener(evt,e=>{e.preventDefault();$('dropzone').classList.remove('drag');}));$('dropzone').addEventListener('drop',e=>setOCRFiles(e.dataTransfer.files));
+try{const saved=JSON.parse(localStorage.getItem('wosSpeedupInventoryV7')||'[]');if(Array.isArray(saved)&&saved.length){ocrRows=saved;renderOCRRows();}}catch{}updateOCRButtons();
 </script>
 
 </body></html>
