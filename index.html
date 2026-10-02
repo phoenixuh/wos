@@ -13,25 +13,26 @@
   --purple:#c2a1ff; --shadow:0 22px 55px rgba(0,0,0,.35);
 }
 *{box-sizing:border-box}
+html,body{width:100%;max-width:100%;overflow-x:hidden}
 body{margin:0;color:var(--text);font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans KR",sans-serif;line-height:1.45;background:
   radial-gradient(circle at 15% 5%,rgba(92,195,255,.16),transparent 25%),
   radial-gradient(circle at 90% 10%,rgba(164,115,255,.12),transparent 26%),
   linear-gradient(155deg,#061020,#0b1730 46%,#061020);min-height:100vh}
 body:before{content:"";position:fixed;inset:0;pointer-events:none;opacity:.5;background-image:radial-gradient(circle at 20% 30%,rgba(255,255,255,.18) 0 1px,transparent 1px),radial-gradient(circle at 70% 18%,rgba(255,255,255,.12) 0 1px,transparent 1px),radial-gradient(circle at 40% 80%,rgba(255,255,255,.12) 0 1px,transparent 1px);background-size:140px 140px,220px 220px,180px 180px}
-.container{max-width:1320px;margin:auto;padding:18px 18px 56px;position:relative}
+.container{width:100%;max-width:1320px;margin:auto;padding:18px 18px 56px;position:relative}
 .hero{display:flex;justify-content:space-between;align-items:end;gap:18px;margin:12px 0 20px;padding:18px 6px}
 .hero-title{display:flex;align-items:center;gap:14px}
 .hero-crystal{width:52px;height:52px;border-radius:16px;display:grid;place-items:center;font-size:28px;background:linear-gradient(145deg,rgba(126,229,255,.2),rgba(120,100,255,.14));border:1px solid rgba(141,232,255,.45);box-shadow:0 0 35px rgba(79,191,232,.16),inset 0 0 22px rgba(141,232,255,.09)}
 .hero h1{font-size:clamp(26px,4vw,42px);margin:0;letter-spacing:-.04em} .hero p{margin:4px 0 0;color:var(--muted);font-size:14px}
 .status-pill{padding:8px 12px;border-radius:999px;background:rgba(104,224,176,.08);border:1px solid rgba(104,224,176,.28);color:var(--good);font-weight:700;font-size:12px;white-space:nowrap}
-.layout{display:grid;grid-template-columns:minmax(0,1.02fr) minmax(0,.98fr);gap:18px;align-items:start}
+.layout{display:grid;grid-template-columns:minmax(0,1.02fr) minmax(0,.98fr);gap:18px;align-items:start;min-width:0}.layout>.panel{min-width:0}
 .panel{background:linear-gradient(180deg,rgba(17,33,62,.95),rgba(10,23,45,.95));border:1px solid var(--line);border-radius:22px;box-shadow:var(--shadow);padding:18px}
 .panel h2{margin:0 0 14px;font-size:18px;letter-spacing:-.02em} .panel h3{margin:18px 0 10px;font-size:14px;color:#cfe0fb}
 .section-label{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px}
 .badge{font-size:11px;color:var(--muted);padding:5px 8px;border-radius:999px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06)}
 .building-card{position:relative;overflow:hidden;border:1px solid rgba(141,232,255,.24);border-radius:18px;padding:15px;background:linear-gradient(135deg,rgba(47,101,152,.18),rgba(48,35,92,.15))}
 .building-card:after{content:"";position:absolute;right:-34px;top:-54px;width:130px;height:130px;transform:rotate(35deg);background:linear-gradient(135deg,transparent 35%,rgba(141,232,255,.09) 36%,transparent 57%)}
-.building-main{display:flex;align-items:center;gap:12px} .building-icon{width:50px;height:50px;border-radius:15px;display:grid;place-items:center;font-size:27px;background:rgba(5,16,34,.55);border:1px solid rgba(141,232,255,.2)}
+.building-main{display:flex;align-items:center;gap:12px;min-width:0}.building-main>div:last-child{min-width:0} .building-icon{width:50px;height:50px;border-radius:15px;display:grid;place-items:center;font-size:27px;background:rgba(5,16,34,.55);border:1px solid rgba(141,232,255,.2)}
 .building-name{font-weight:800;font-size:17px} .subtle{color:var(--muted);font-size:12px}
 .level-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
 .field{display:flex;flex-direction:column;gap:6px} .field label{font-size:12px;color:#c9d9f2}
@@ -48,20 +49,20 @@ body:before{content:"";position:fixed;inset:0;pointer-events:none;opacity:.5;bac
 .callout strong{font-size:14px} .callout .subtle{margin-top:3px}
 .progress-wrap{display:grid;gap:9px;margin-bottom:14px} .progress-row{display:grid;grid-template-columns:92px 1fr 78px;gap:9px;align-items:center} .progress-label{font-size:12px;color:#c5d7ef} .progress-bar{height:10px;background:#071125;border:1px solid #223758;border-radius:999px;overflow:hidden} .progress-fill{height:100%;border-radius:999px;background:linear-gradient(90deg,#4fbfe8,#7de4c0)} .progress-fill.bad{background:linear-gradient(90deg,#ff7d7d,#ffb26b)} .progress-value{text-align:right;font-size:11px;color:var(--muted)}
 .tabs{display:flex;gap:7px;margin-bottom:10px} .tab{border:1px solid var(--line);background:rgba(255,255,255,.02);color:#bdd0eb;border-radius:10px;padding:7px 10px;font-size:11px;cursor:pointer} .tab.active{background:rgba(141,232,255,.12);color:#fff;border-color:rgba(141,232,255,.42)}
-.table-wrap{overflow:auto;border:1px solid var(--line);border-radius:14px} table{width:100%;border-collapse:collapse;min-width:720px} th,td{padding:9px 10px;border-bottom:1px solid rgba(43,65,104,.58);text-align:right;font-size:11px} th{color:#c5d7ef;background:#09172d;position:sticky;top:0} th:first-child,td:first-child{text-align:left} tr:last-child td{border-bottom:0}
+.table-wrap{overflow:auto;border:1px solid var(--line);border-radius:14px;max-width:100%} table{width:100%;border-collapse:collapse;min-width:720px} th,td{padding:9px 10px;border-bottom:1px solid rgba(43,65,104,.58);text-align:right;font-size:11px} th{color:#c5d7ef;background:#09172d;position:sticky;top:0} th:first-child,td:first-child{text-align:left} tr:last-child td{border-bottom:0}
 .enough{color:var(--good);font-weight:800} .shortage{color:var(--bad);font-weight:800} .gold{color:var(--gold);font-weight:800}
 .plan-box{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0} .plan-item{padding:12px;border-radius:14px;border:1px solid var(--line);background:rgba(5,15,29,.42)} .plan-item .big{font-size:17px;font-weight:850;margin-top:2px}
 .source{margin-top:13px;color:#7f95b9;font-size:11px;line-height:1.6} .source a{color:#9edcff} .footer{margin-top:16px;color:#7086ab;font-size:11px;text-align:center}
 @media(max-width:1080px){.layout{grid-template-columns:1fr}}
-@media(max-width:760px){.hero{align-items:flex-start;flex-direction:column}.metrics{grid-template-columns:repeat(2,1fr)} .progress-row{grid-template-columns:76px 1fr 72px}}
-@media(max-width:580px){.container{padding:10px 10px 40px}.panel{padding:13px;border-radius:18px}.level-row,.input-grid,.plan-box{grid-template-columns:1fr}.metrics{grid-template-columns:1fr 1fr}.btn{flex:1 1 auto}.hero-crystal{width:44px;height:44px}}
+@media(max-width:760px){.hero{align-items:flex-start;flex-direction:column}.metrics{grid-template-columns:repeat(2,1fr)} .progress-row{grid-template-columns:76px 1fr 72px}.layout{grid-template-columns:1fr}.panel{min-width:0}}
+@media(max-width:580px){.container{padding:10px 10px 32px}.panel{padding:13px;border-radius:18px}.level-row,.input-grid,.plan-box{grid-template-columns:1fr}.metrics{grid-template-columns:1fr 1fr}.btn{flex:1 1 auto;min-width:0}.hero-crystal{width:44px;height:44px}.hero{gap:10px;margin:6px 0 12px;padding:10px 2px}.hero h1{font-size:24px;line-height:1.18}.hero p{font-size:12px}.status-pill{align-self:flex-start;font-size:10px;padding:6px 9px}.building-card{padding:12px}.building-name{font-size:16px}.quick-levels{gap:6px}.chip{font-size:10px;padding:6px 8px}.input-card{padding:10px}.input-card .title{gap:8px}.input-card .unit{font-size:9px;text-align:right}.field input,.field select{font-size:16px;min-height:44px}.buttons{gap:7px}.btn{padding:10px 10px;font-size:12px}.metrics .metric{padding:10px}.metric .k{font-size:10px}.metric .v{font-size:15px}.callout{padding:11px 12px}.progress-row{grid-template-columns:64px 1fr 70px;gap:7px}.progress-label,.progress-value{font-size:10px}.tabs{position:sticky;top:0;z-index:5;padding:6px 0;background:linear-gradient(180deg,#11213e 80%,transparent)}.tab{flex:1;padding:9px 8px}.table-wrap{overflow:visible;border:0;border-radius:0}.table-wrap table{min-width:0;width:100%;display:block}.table-wrap thead{display:none}.table-wrap tbody{display:grid;gap:8px}.table-wrap tr{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:10px;border:1px solid var(--line);border-radius:12px;background:rgba(4,14,28,.34)}.table-wrap td{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;padding:4px 5px;border:0;font-size:10px;text-align:right;min-width:0}.table-wrap td::before{content:attr(data-label);color:var(--muted);font-weight:600;text-align:left;flex:0 0 auto}.table-wrap td:first-child{grid-column:1 / -1;font-size:12px;font-weight:800;text-align:left;padding-bottom:7px;border-bottom:1px solid rgba(43,65,104,.58)}.table-wrap td:first-child::before{font-size:10px}.source{font-size:10px}.footer{font-size:10px}}
 </style>
 </head>
 <body>
 <div class="container">
   <header class="hero">
     <div class="hero-title"><div class="hero-crystal">❄️</div><div><h1>화이트아웃 서바이벌<br>건물 업그레이드 계산기</h1><p>한국 유저용 개선판 · PC / 모바일 반응형 · 자원·가속권까지 한 번에 계산</p></div></div>
-    <div class="status-pill">● 팬메이드 도구 · V0.2</div>
+    <div class="status-pill">● 팬메이드 도구 · V0.3</div>
   </header>
 
   <div class="layout">
@@ -137,7 +138,7 @@ body:before{content:"";position:fixed;inset:0;pointer-events:none;opacity:.5;bac
       <div class="source">※ 일반 가속권 + 건설 가속권을 모두 해당 건설에 사용할 수 있다고 가정해 합산 계산합니다. 실제 게임의 특정 버프/이벤트 적용 순서가 달라질 경우 계산 모듈에서 조정할 수 있습니다.</div>
     </section>
   </div>
-  <div class="footer">WOS Building Calculator KR · V0.2 · 독립 비공식 팬메이드 도구 · 게임사와 무관</div>
+  <div class="footer">WOS Building Calculator KR · V0.3 · 독립 비공식 팬메이드 도구 · 게임사와 무관</div>
 </div>
 
 <script>
@@ -292,22 +293,25 @@ function renderSpeedPlan(effectiveTime, inputs){
 }
 function renderTable(details, mode){
   $('tableHead').innerHTML=mode==='detail' ? '<tr><th>업그레이드</th><th>기본 시간</th><th>버프 적용</th><th>고기</th><th>나무</th><th>석탄</th><th>철</th><th>FC</th><th>정제 FC</th></tr>' : '<tr><th>목표 레벨</th><th>누적 기본시간</th><th>누적 적용시간</th><th>누적 고기</th><th>누적 나무</th><th>누적 석탄</th><th>누적 철</th><th>누적 FC</th><th>누적 정제 FC</th></tr>';
+  const detailLabels=['업그레이드','기본 시간','버프 적용','고기','나무','석탄','철','FC','정제 FC'];
+  const cumulativeLabels=['목표 레벨','누적 기본시간','누적 적용시간','누적 고기','누적 나무','누적 석탄','누적 철','누적 FC','누적 정제 FC'];
+  const cell=(label,value,cls='')=>`<td data-label="${label}" class="${cls}">${value}</td>`;
   $('detailTable').innerHTML=details.map(d=> mode==='detail'
-    ? `<tr><td>${d.label}</td><td>${duration(d.time)}</td><td>${duration(d.effective)}</td><td>${fmt(d.meatAdj)}</td><td>${fmt(d.woodAdj)}</td><td>${fmt(d.coalAdj)}</td><td>${fmt(d.ironAdj)}</td><td>${fmt(d.fc)}</td><td>${fmt(d.rfc)}</td></tr>`
-    : `<tr><td>${d.label}</td><td>${duration(d.cum.time)}</td><td>${duration(d.cum.effectiveTime)}</td><td>${fmt(d.cum.meat)}</td><td>${fmt(d.cum.wood)}</td><td>${fmt(d.cum.coal)}</td><td>${fmt(d.cum.iron)}</td><td>${fmt(d.cum.fc)}</td><td>${fmt(d.cum.rfc)}</td></tr>`).join('');
+    ? `<tr>${cell(detailLabels[0],d.label)}${cell(detailLabels[1],duration(d.time))}${cell(detailLabels[2],duration(d.effective))}${cell(detailLabels[3],fmt(d.meatAdj))}${cell(detailLabels[4],fmt(d.woodAdj))}${cell(detailLabels[5],fmt(d.coalAdj))}${cell(detailLabels[6],fmt(d.ironAdj))}${cell(detailLabels[7],fmt(d.fc))}${cell(detailLabels[8],fmt(d.rfc))}</tr>`
+    : `<tr>${cell(cumulativeLabels[0],d.label)}${cell(cumulativeLabels[1],duration(d.cum.time))}${cell(cumulativeLabels[2],duration(d.cum.effectiveTime))}${cell(cumulativeLabels[3],fmt(d.cum.meat))}${cell(cumulativeLabels[4],fmt(d.cum.wood))}${cell(cumulativeLabels[5],fmt(d.cum.coal))}${cell(cumulativeLabels[6],fmt(d.cum.iron))}${cell(cumulativeLabels[7],fmt(d.cum.fc))}${cell(cumulativeLabels[8],fmt(d.cum.rfc))}</tr>`).join('');
 }
-function persist(){ const ids=['fromLevel','toLevel','constructionSpeed','zinman','extraBuild','doubleTime','meat','wood','coal','iron','generalSpeedup','constructionSpeedup','fireCrystal','refinedFC']; localStorage.setItem('wosCalcV2',JSON.stringify(Object.fromEntries(ids.map(id=>[id,$(id).value])))); }
-function restore(){ try{ const d=JSON.parse(localStorage.getItem('wosCalcV2')||'{}'); for(const [k,v] of Object.entries(d)) if($(k)) $(k).value=v; }catch{} }
+function persist(){ const ids=['fromLevel','toLevel','constructionSpeed','zinman','extraBuild','doubleTime','meat','wood','coal','iron','generalSpeedup','constructionSpeedup','fireCrystal','refinedFC']; localStorage.setItem('wosCalcV3',JSON.stringify(Object.fromEntries(ids.map(id=>[id,$(id).value])))); }
+function restore(){ try{ const d=JSON.parse(localStorage.getItem('wosCalcV3')||'{}'); for(const [k,v] of Object.entries(d)) if($(k)) $(k).value=v; }catch{} }
 function render(){
   const fi=ids.indexOf($('fromLevel').value), ti=ids.indexOf($('toLevel').value); if(fi<0||ti<=fi){setText('headline','목표 레벨을 현재보다 높게 선택해주세요.');return;}
   const inputs=getInputs(); const range=calcRange(fi,ti,inputs); const reachable=maxAffordable(fi,inputs); const effective=range.r.effectiveTime; const available=(inputs.genMinutes+inputs.conMinutes)*60; const extra=Math.max(0,effective-available); const enough=invEnough(range.r,inputs.inv);
+  const hasInventory=Object.values(inputs.inv).some(v=>v>0);
   setText('totalTime',duration(range.r.time)); setText('effectiveTime',duration(effective)); setText('speedNeed',duration(extra)); setText('maxReach',labels[DATA[reachable].id]);
   setText('headline',`${labels[DATA[fi].id]} → ${labels[DATA[ti].id]} · ${range.details.length}단계`);
   const inventoryNote=hasInventory?'입력한 자원을 모두 사용한다고 가정':'보유 자원을 입력하면 최대 도달 레벨이 계산됩니다';
   setText('summary',`건설속도 ${pct(inputs.speed)} 적용 · 자원 절감 ${pct(inputs.zin)} · 추가 시간 감소 ${pct(inputs.dt)} · 가속권 가용 ${duration(available)} · ${inventoryNote}`);
   $('resultBadge').textContent=enough?'목표 달성 가능':'자원 부족'; $('resultBadge').style.color=enough?'var(--good)':'var(--bad)'; $('resultBadge').style.borderColor=enough?'rgba(104,224,176,.28)':'rgba(255,119,119,.28)';
   $('maxMetric').classList.toggle('good', reachable>=ti); $('maxMetric').classList.toggle('bad', reachable<ti);
-  const hasInventory=Object.values(inputs.inv).some(v=>v>0);
   setText('reachCurrent',labels[DATA[fi].id]); setText('reachTarget',hasInventory?labels[DATA[reachable].id]:'자원 미입력');
   renderProgress(range.r,inputs.inv); renderSpeedPlan(effective,inputs); renderTable(range.details,document.querySelector('.tab.active').dataset.tab); persist();
 }
@@ -316,7 +320,7 @@ $('calc').addEventListener('click',render);
 ['fromLevel','toLevel','constructionSpeed','zinman','extraBuild','doubleTime','meat','wood','coal','iron','generalSpeedup','constructionSpeedup','fireCrystal','refinedFC'].forEach(id=>$(id).addEventListener('input',()=>persist()));
 $('preset1').addEventListener('click',()=>{ $('meat').value='1.5b';$('wood').value='2b';$('coal').value='850m';$('iron').value='4300000';$('generalSpeedup').value='2500';$('constructionSpeedup').value='1200';$('fireCrystal').value='300';$('refinedFC').value='50';render(); });
 $('clearResources').addEventListener('click',()=>{ ['meat','wood','coal','iron','generalSpeedup','constructionSpeedup','fireCrystal','refinedFC'].forEach(id=>$(id).value='');render(); });
-$('reset').addEventListener('click',()=>{localStorage.removeItem('wosCalcV2');location.reload()});
+$('reset').addEventListener('click',()=>{localStorage.removeItem('wosCalcV3');location.reload()});
 $('copy').addEventListener('click',async()=>{ const txt=`화이트아웃 서바이벌 건물 계산기\n${document.getElementById('headline').textContent}\n총 기본 건설시간: ${document.getElementById('totalTime').textContent}\n버프 적용 후: ${document.getElementById('effectiveTime').textContent}\n필요 가속시간: ${document.getElementById('speedNeed').textContent}\n자원 기준 가능 레벨: ${document.getElementById('maxReach').textContent}`; try{await navigator.clipboard.writeText(txt);$('copy').textContent='복사 완료 ✓';setTimeout(()=>$('copy').textContent='결과 복사',1200)}catch{alert(txt)} });
 document.querySelectorAll('.chip').forEach(b=>b.addEventListener('click',()=>{const [f,t]=b.dataset.range.split('-');$('fromLevel').value=f;$('toLevel').value=t;render();}));
 document.querySelectorAll('.tab').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));b.classList.add('active');render();}));
