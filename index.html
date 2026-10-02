@@ -42,7 +42,7 @@ body:before{content:"";position:fixed;inset:0;pointer-events:none;opacity:.5;bac
 .input-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 .input-card{padding:12px;border:1px solid rgba(57,87,132,.72);background:rgba(4,14,28,.38);border-radius:14px}
 .input-card .title{display:flex;justify-content:space-between;align-items:center;margin-bottom:7px} .icon{font-size:18px} .unit{font-size:11px;color:var(--muted)}
-.buttons{display:flex;flex-wrap:wrap;gap:9px;margin-top:14px} .btn{border:0;border-radius:12px;padding:11px 14px;background:var(--panel2);color:var(--text);cursor:pointer;font-weight:750} .btn.primary{background:linear-gradient(135deg,#73d9fb,#76e2bb);color:#06111f;box-shadow:0 8px 24px rgba(85,210,225,.12)} .btn.ghost{border:1px solid var(--line);background:rgba(255,255,255,.02)} .btn:active{transform:translateY(1px)}
+.buttons{display:flex;flex-wrap:wrap;gap:9px;margin-top:14px} .btn:disabled{opacity:.45;cursor:not-allowed;transform:none} .btn{border:0;border-radius:12px;padding:11px 14px;background:var(--panel2);color:var(--text);cursor:pointer;font-weight:750} .btn.primary{background:linear-gradient(135deg,#73d9fb,#76e2bb);color:#06111f;box-shadow:0 8px 24px rgba(85,210,225,.12)} .btn.ghost{border:1px solid var(--line);background:rgba(255,255,255,.02)} .btn:active{transform:translateY(1px)}
 .note{padding:11px 12px;border-left:3px solid var(--gold);background:rgba(255,215,107,.06);color:#dce6f5;border-radius:9px;font-size:12px;margin-top:12px}
 .metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin-bottom:12px} .metric{padding:13px;border-radius:15px;background:#09172d;border:1px solid var(--line);min-width:0} .metric .k{font-size:11px;color:var(--muted)} .metric .v{font-size:18px;font-weight:850;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis} .metric.good .v{color:var(--good)} .metric.bad .v{color:var(--bad)} .metric.gold .v{color:var(--gold)}
 .callout{padding:13px 14px;margin:10px 0 14px;border-radius:15px;border:1px solid rgba(141,232,255,.24);background:linear-gradient(90deg,rgba(141,232,255,.08),rgba(194,161,255,.05))}
@@ -60,11 +60,11 @@ body:before{content:"";position:fixed;inset:0;pointer-events:none;opacity:.5;bac
 /* Dynamic OCR module · V0.5 */
 .ocr-panel{margin-top:14px;padding:14px;border-radius:18px;border:1px solid rgba(141,232,255,.25);background:linear-gradient(145deg,rgba(19,48,87,.55),rgba(19,31,67,.35))}
 .ocr-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}.ocr-title{font-weight:850;font-size:15px}.ocr-sub{font-size:11px;color:var(--muted);margin-top:3px}.ocr-status{font-size:11px;color:var(--ice);white-space:nowrap}
-.dropzone{margin-top:11px;border:1px dashed rgba(141,232,255,.48);border-radius:16px;padding:18px;text-align:center;background:rgba(5,16,34,.3);cursor:pointer;transition:.15s}.dropzone.drag{border-color:var(--gold);background:rgba(255,215,107,.06)}.dropzone input{display:none}.drop-icon{font-size:30px}.drop-main{font-size:13px;font-weight:800;margin-top:4px}.drop-help{font-size:10px;color:var(--muted);margin-top:4px}
+.dropzone{position:relative;margin-top:11px;border:1px dashed rgba(141,232,255,.48);border-radius:16px;padding:18px;text-align:center;background:rgba(5,16,34,.3);cursor:pointer;transition:.15s;outline:none}.dropzone:hover,.dropzone:focus-visible{border-color:var(--ice);background:rgba(141,232,255,.05)}.dropzone.drag{border-color:var(--gold);background:rgba(255,215,107,.06)}.file-input{position:absolute!important;width:1px!important;height:1px!important;opacity:0!important;pointer-events:none!important}.drop-icon{font-size:30px}.drop-main{font-size:13px;font-weight:800;margin-top:4px}.drop-help{font-size:10px;color:var(--muted);margin-top:4px}.drop-actions{display:flex;justify-content:center;margin-top:10px}.upload-btn{min-width:140px}
 .ocr-toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-top:9px}.ocr-toolbar .btn{font-size:11px;padding:9px 11px}.ocr-preview{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:10px}.ocr-thumb{position:relative;border:1px solid var(--line);border-radius:11px;overflow:hidden;background:#071125}.ocr-thumb img{display:block;width:100%;height:90px;object-fit:cover}.ocr-thumb span{position:absolute;left:6px;bottom:5px;font-size:9px;background:rgba(0,0,0,.7);padding:3px 6px;border-radius:999px}.ocr-results{margin-top:12px}.ocr-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px}.ocr-stat{padding:9px 10px;border:1px solid var(--line);border-radius:12px;background:rgba(4,14,28,.38)}.ocr-stat .k{font-size:9px;color:var(--muted)}.ocr-stat .v{font-size:15px;font-weight:850;margin-top:2px}.ocr-table{overflow:auto;border:1px solid var(--line);border-radius:13px}.ocr-table table{min-width:650px}.ocr-table th,.ocr-table td{font-size:10px;padding:8px}.ocr-edit{width:100%;min-width:0;padding:7px;border-radius:9px;border:1px solid var(--line);background:#08162b;color:#fff;font-size:12px}.ocr-confidence{font-size:9px;color:var(--muted)}.conf-good{color:var(--good)}.conf-check{color:var(--gold)}
 .ocr-note{font-size:10px;color:#a9bbd6;margin-top:9px;line-height:1.55}.ocr-note b{color:#dceaff}.ocr-mini{font-size:10px;color:var(--muted);margin-top:7px}.speedup-total-note{margin-top:9px;padding:9px 10px;border-radius:11px;background:rgba(104,224,176,.06);border:1px solid rgba(104,224,176,.18);font-size:10px;color:#cfece0}.speedup-total-note strong{color:var(--good)}
 @media(max-width:760px){.ocr-preview{grid-template-columns:repeat(2,1fr)}.ocr-summary{grid-template-columns:1fr 1fr}.ocr-head{flex-direction:column}.ocr-status{align-self:flex-start}}
-@media(max-width:580px){.ocr-panel{padding:11px}.dropzone{padding:15px 10px}.ocr-preview{grid-template-columns:repeat(2,1fr)}.ocr-thumb img{height:78px}.ocr-summary{grid-template-columns:1fr 1fr}.ocr-stat .v{font-size:13px}.ocr-table{border:0;overflow:visible}.ocr-table table{min-width:0;width:100%;display:block}.ocr-table thead{display:none}.ocr-table tbody{display:grid;gap:7px}.ocr-table tr{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:9px;border:1px solid var(--line);border-radius:11px;background:rgba(4,14,28,.34)}.ocr-table td{display:flex;flex-direction:column;gap:4px;padding:4px;border:0;text-align:left}.ocr-table td::before{content:attr(data-label);font-size:9px;color:var(--muted)}.ocr-table td:first-child{grid-column:1 / -1}.ocr-table td:first-child::before{content:'분류'}}
+@media(max-width:580px){.ocr-panel{padding:11px}.dropzone{padding:15px 10px}.upload-btn{width:100%;min-height:42px}.ocr-preview{grid-template-columns:repeat(2,1fr)}.ocr-thumb img{height:78px}.ocr-summary{grid-template-columns:1fr 1fr}.ocr-stat .v{font-size:13px}.ocr-table{border:0;overflow:visible}.ocr-table table{min-width:0;width:100%;display:block}.ocr-table thead{display:none}.ocr-table tbody{display:grid;gap:7px}.ocr-table tr{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:9px;border:1px solid var(--line);border-radius:11px;background:rgba(4,14,28,.34)}.ocr-table td{display:flex;flex-direction:column;gap:4px;padding:4px;border:0;text-align:left}.ocr-table td::before{content:attr(data-label);font-size:9px;color:var(--muted)}.ocr-table td:first-child{grid-column:1 / -1}.ocr-table td:first-child::before{content:'분류'}}
 
 </style>
 </head>
@@ -72,7 +72,7 @@ body:before{content:"";position:fixed;inset:0;pointer-events:none;opacity:.5;bac
 <div class="container">
   <header class="hero">
     <div class="hero-title"><div class="hero-crystal">❄️</div><div><h1>화이트아웃 서바이벌<br>건물 업그레이드 계산기</h1><p>한국 유저용 개선판 · PC / 모바일 반응형 · 자원·가속권까지 한 번에 계산</p></div></div>
-    <div class="status-pill">● 팬메이드 도구 · V0.5</div>
+    <div class="status-pill">● 팬메이드 도구 · V0.6</div>
   </header>
 
   <div class="layout">
@@ -109,19 +109,21 @@ body:before{content:"";position:fixed;inset:0;pointer-events:none;opacity:.5;bac
 
       <div class="ocr-panel" id="ocrPanel">
         <div class="ocr-head">
-          <div><div class="ocr-title">📷 가속권 스크린샷 자동 인식 <span class="badge">V0.5 BETA</span></div><div class="ocr-sub">공용 · 건설 · 연구 · 훈련 · 치료 가속권을 종류/시간별로 인식해 계산기에 자동 입력합니다.</div></div>
+          <div><div class="ocr-title">📷 가속권 스크린샷 자동 인식 <span class="badge">V0.6 BETA</span></div><div class="ocr-sub">공용 · 건설 · 연구 · 훈련 · 치료 가속권을 종류/시간별로 인식해 계산기에 자동 입력합니다.</div></div>
           <div id="ocrStatus" class="ocr-status">준비됨</div>
         </div>
-        <label class="dropzone" id="dropzone" for="speedupFiles">
-          <input id="speedupFiles" type="file" accept="image/*" multiple>
+        <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="가속권 스크린샷 선택">
+          <input id="speedupFiles" class="file-input" type="file" accept="image/*" multiple>
           <div class="drop-icon">📸</div>
-          <div class="drop-main">가속권 스크린샷을 선택하거나 여기로 끌어놓기</div>
-          <div class="drop-help">권장: 게임의 가방 → 가속 화면 전체 캡처 · 카드 수/행/열 제한 없이 자동 탐지 · 여러 장 선택 가능 · 같은 종류를 여러 장 올리면 자동 합산</div>
-        </label>
+          <div class="drop-main">가속권 스크린샷을 첨부하세요</div>
+          <div class="drop-help">게임의 가방 → 가속 화면 전체 캡처 · 카드 수/행/열 제한 없음 · 여러 장 선택 가능</div>
+          <div class="drop-actions"><button type="button" class="btn primary upload-btn" id="speedupPick">📷 사진 선택</button></div>
+          <div class="drop-help">PC에서는 이미지를 끌어놓을 수도 있습니다.</div>
+        </div>
         <div class="ocr-toolbar">
-          <button class="btn ghost" id="ocrAnalyze" disabled>🔎 스크린샷 분석</button>
-          <button class="btn ghost" id="ocrClear">첨부/인식 결과 지우기</button>
-          <button class="btn primary" id="ocrApply" disabled>✅ 인식 결과를 계산기에 적용</button>
+          <button type="button" class="btn ghost" id="ocrAnalyze" disabled>🔎 스크린샷 분석</button>
+          <button type="button" class="btn ghost" id="ocrClear">첨부/인식 결과 지우기</button>
+          <button type="button" class="btn primary" id="ocrApply" disabled>✅ 인식 결과를 계산기에 적용</button>
         </div>
         <div class="ocr-preview" id="ocrPreview"></div>
         <div class="ocr-results" id="ocrResults" hidden>
@@ -180,7 +182,7 @@ body:before{content:"";position:fixed;inset:0;pointer-events:none;opacity:.5;bac
       <div class="source">※ 건물 업그레이드에서는 공용 가속권 + 건설 가속권을 합산해 사용할 수 있다고 가정합니다. 스크린샷 OCR 결과는 적용 전 확인을 권장합니다. 실제 게임의 특정 버프/이벤트 적용 순서가 달라질 경우 계산 모듈에서 조정할 수 있습니다.</div>
     </section>
   </div>
-  <div class="footer">WOS Building Calculator KR · V0.5 · 독립 비공식 팬메이드 도구 · 게임사와 무관</div>
+  <div class="footer">WOS Building Calculator KR · V0.6 · 독립 비공식 팬메이드 도구 · 게임사와 무관</div>
 </div>
 
 <script>
@@ -268,6 +270,7 @@ const DATA = [
 ];
 
 const $=id=>document.getElementById(id);
+const escapeHtml = (value) => String(value ?? '').replace(/[&<>\"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[ch]));
 const fmt=n=>new Intl.NumberFormat('ko-KR').format(Math.round(n));
 const pct=n=>(n*100).toFixed(1).replace('.0','')+'%';
 function parseNum(v){
@@ -342,7 +345,7 @@ function renderTable(details, mode){
     ? `<tr>${cell(detailLabels[0],d.label)}${cell(detailLabels[1],duration(d.time))}${cell(detailLabels[2],duration(d.effective))}${cell(detailLabels[3],fmt(d.meatAdj))}${cell(detailLabels[4],fmt(d.woodAdj))}${cell(detailLabels[5],fmt(d.coalAdj))}${cell(detailLabels[6],fmt(d.ironAdj))}${cell(detailLabels[7],fmt(d.fc))}${cell(detailLabels[8],fmt(d.rfc))}</tr>`
     : `<tr>${cell(cumulativeLabels[0],d.label)}${cell(cumulativeLabels[1],duration(d.cum.time))}${cell(cumulativeLabels[2],duration(d.cum.effectiveTime))}${cell(cumulativeLabels[3],fmt(d.cum.meat))}${cell(cumulativeLabels[4],fmt(d.cum.wood))}${cell(cumulativeLabels[5],fmt(d.cum.coal))}${cell(cumulativeLabels[6],fmt(d.cum.iron))}${cell(cumulativeLabels[7],fmt(d.cum.fc))}${cell(cumulativeLabels[8],fmt(d.cum.rfc))}</tr>`).join('');
 }
-function persist(){ const ids=['fromLevel','toLevel','constructionSpeed','zinman','extraBuild','doubleTime','meat','wood','coal','iron','generalSpeedup','constructionSpeedup','fireCrystal','refinedFC']; localStorage.setItem('wosCalcV5',JSON.stringify(Object.fromEntries(ids.map(id=>[id,$(id).value])))); }
+function persist(){ try{ const ids=['fromLevel','toLevel','constructionSpeed','zinman','extraBuild','doubleTime','meat','wood','coal','iron','generalSpeedup','constructionSpeedup','fireCrystal','refinedFC']; localStorage.setItem('wosCalcV5',JSON.stringify(Object.fromEntries(ids.map(id=>[id,$(id).value])))); }catch{} }
 function restore(){ try{ const d=JSON.parse(localStorage.getItem('wosCalcV5')||'{}'); for(const [k,v] of Object.entries(d)) if($(k)) $(k).value=v; }catch{} }
 function render(){
   const fi=ids.indexOf($('fromLevel').value), ti=ids.indexOf($('toLevel').value); if(fi<0||ti<=fi){setText('headline','목표 레벨을 현재보다 높게 선택해주세요.');return;}
@@ -362,7 +365,7 @@ $('calc').addEventListener('click',render);
 ['fromLevel','toLevel','constructionSpeed','zinman','extraBuild','doubleTime','meat','wood','coal','iron','generalSpeedup','constructionSpeedup','fireCrystal','refinedFC'].forEach(id=>$(id).addEventListener('input',()=>persist()));
 $('preset1').addEventListener('click',()=>{ $('meat').value='1.5b';$('wood').value='2b';$('coal').value='850m';$('iron').value='4300000';$('generalSpeedup').value='2500';$('constructionSpeedup').value='1200';$('fireCrystal').value='300';$('refinedFC').value='50';render(); });
 $('clearResources').addEventListener('click',()=>{ ['meat','wood','coal','iron','generalSpeedup','constructionSpeedup','fireCrystal','refinedFC'].forEach(id=>$(id).value='');render(); });
-$('reset').addEventListener('click',()=>{localStorage.removeItem('wosCalcV5');location.reload()});
+$('reset').addEventListener('click',()=>{try{localStorage.removeItem('wosCalcV5');}catch{} location.reload()});
 $('copy').addEventListener('click',async()=>{ const txt=`화이트아웃 서바이벌 건물 계산기\n${document.getElementById('headline').textContent}\n총 기본 건설시간: ${document.getElementById('totalTime').textContent}\n버프 적용 후: ${document.getElementById('effectiveTime').textContent}\n필요 가속시간: ${document.getElementById('speedNeed').textContent}\n자원 기준 가능 레벨: ${document.getElementById('maxReach').textContent}`; try{await navigator.clipboard.writeText(txt);$('copy').textContent='복사 완료 ✓';setTimeout(()=>$('copy').textContent='결과 복사',1200)}catch{alert(txt)} });
 document.querySelectorAll('.chip').forEach(b=>b.addEventListener('click',()=>{const [f,t]=b.dataset.range.split('-');$('fromLevel').value=f;$('toLevel').value=t;render();}));
 document.querySelectorAll('.tab').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));b.classList.add('active');render();}));
@@ -381,7 +384,7 @@ const DURATION_OPTIONS = [
   ['1분',1],['5분',5],['10분',10],['15분',15],['30분',30],['1시간',60],['3시간',180],['8시간',480],['24시간',1440],['1일',1440]
 ];
 // V0.5: full-screen dynamic card detection. No fixed row/column count.
-let ocrFiles=[],ocrRows=[],ocrWorkers={kor:null,eng:null,korSparse:null,engSparse:null},ocrTesseractLoading=false;
+let ocrFiles=[],ocrRows=[],ocrWorkers={kor:null,eng:null,korSparse:null,engSparse:null},ocrTesseractLoading=false,ocrBusy=false;
 function formatMinutes(min){min=Math.max(0,Math.round(min));const d=Math.floor(min/1440);min%=1440;const h=Math.floor(min/60);const m=min%60;const out=[];if(d)out.push(d+'일');if(h)out.push(h+'시간');if(m)out.push(m+'분');if(!out.length)out.push('0분');return out.join(' ');}
 function speedupDurationMinutes(label){return (DURATION_OPTIONS.find(x=>x[0]===label)||[label,1])[1];}
 function durationFromText(s){
@@ -392,8 +395,16 @@ function durationFromText(s){
   return null;
 }
 function setOCRStatus(t){const e=$('ocrStatus');if(e)e.textContent=t;}
-function updateOCRButtons(){$('ocrAnalyze').disabled=!ocrFiles.length;$('ocrApply').disabled=!ocrRows.length;}
+function updateOCRButtons(){ $('ocrAnalyze').disabled=ocrBusy||!ocrFiles.length; $('ocrApply').disabled=ocrBusy||!ocrRows.length; $('ocrClear').disabled=ocrBusy; $('speedupPick').disabled=ocrBusy; }
 function renderOCRPreview(){const box=$('ocrPreview');box.innerHTML='';ocrFiles.forEach((f,i)=>{const url=URL.createObjectURL(f),d=document.createElement('div');d.className='ocr-thumb';d.innerHTML=`<img alt="스크린샷 ${i+1}"><span>${i+1}. ${escapeHtml(f.name).slice(0,18)}</span>`;box.appendChild(d);d.querySelector('img').src=url;setTimeout(()=>URL.revokeObjectURL(url),60000);});}
+function setOCRFiles(files){
+  ocrFiles=[...files].filter(f=>f && f.type && f.type.startsWith('image/'));
+  ocrRows=[];
+  renderOCRPreview();
+  renderOCRRows();
+  updateOCRButtons();
+  if(ocrFiles.length){setOCRStatus(`${ocrFiles.length}장 첨부됨 · 분석할 준비 완료`);}else{setOCRStatus('이미지를 선택해주세요');}
+}
 function totalByCat(cat){return ocrRows.filter(r=>r.cat===cat).reduce((s,r)=>s+r.minutes*r.count,0);}
 function renderOCRSummary(){const g=totalByCat('general'),c=totalByCat('construction');$('ocrCardCount').textContent=ocrRows.length+'개';$('ocrGeneralTotal').textContent=formatMinutes(g);$('ocrConstructionTotal').textContent=formatMinutes(c);$('ocrBuildUsable').textContent=formatMinutes(g+c);}
 function renderOCRRows(){
@@ -492,20 +503,42 @@ async function analyzeOneScreenshot(src,fileName){
   return{rows,detected:anchors.length};
 }
 async function analyzeSpeedupScreenshots(){
-  if(!ocrFiles.length)return;ocrRows=[];renderOCRRows();const files=ocrFiles.slice();let detectedTotal=0;
-  for(let fi=0;fi<files.length;fi++){
-    setOCRStatus(`${fi+1}/${files.length} 이미지 준비 중…`);const src=await loadImage(files[fi]);const result=await analyzeOneScreenshot(src,files[fi].name);detectedTotal+=result.detected;ocrRows.push(...result.rows);
-  }
-  const map=new Map();for(const r of ocrRows){const key=r.cat+'|'+r.label;const old=map.get(key);if(old){old.count+=r.count;old.confidence=Math.min(old.confidence,r.confidence);}else map.set(key,{...r});}
-  ocrRows=[...map.values()].sort((a,b)=>SPEEDUP_CATS.findIndex(x=>x[0]===a.cat)-SPEEDUP_CATS.findIndex(x=>x[0]===b.cat)||a.minutes-b.minutes);
-  setOCRStatus(`완료 · ${detectedTotal}개 카드 탐지 · ${ocrRows.length}개 항목`);renderOCRRows();
+  if(!ocrFiles.length||ocrBusy)return;
+  ocrBusy=true;updateOCRButtons();ocrRows=[];renderOCRRows();const files=ocrFiles.slice();let detectedTotal=0;
+  try{
+    for(let fi=0;fi<files.length;fi++){
+      setOCRStatus(`${fi+1}/${files.length} 이미지 준비 중…`);const src=await loadImage(files[fi]);const result=await analyzeOneScreenshot(src,files[fi].name);detectedTotal+=result.detected;ocrRows.push(...result.rows);
+    }
+    const map=new Map();for(const r of ocrRows){const key=r.cat+'|'+r.label;const old=map.get(key);if(old){old.count+=r.count;old.confidence=Math.min(old.confidence,r.confidence);}else map.set(key,{...r});}
+    ocrRows=[...map.values()].sort((a,b)=>SPEEDUP_CATS.findIndex(x=>x[0]===a.cat)-SPEEDUP_CATS.findIndex(x=>x[0]===b.cat)||a.minutes-b.minutes);
+    setOCRStatus(`완료 · ${detectedTotal}개 카드 탐지 · ${ocrRows.length}개 항목`);renderOCRRows();
+  }finally{ocrBusy=false;updateOCRButtons();}
 }
-function applyOCRToCalculator(){const g=totalByCat('general'),c=totalByCat('construction');$('generalSpeedup').value=String(Math.round(g));$('constructionSpeedup').value=String(Math.round(c));localStorage.setItem('wosSpeedupInventoryV5',JSON.stringify(ocrRows));render();setOCRStatus(`적용 완료 · 건물 사용 가능 ${formatMinutes(g+c)}`);const note=document.querySelector('.speedup-total-note');if(note)note.innerHTML=`✅ <strong>자동 입력 완료:</strong> 공용 ${formatMinutes(g)} + 건설 ${formatMinutes(c)} = 건물용 ${formatMinutes(g+c)}`;}
-function clearOCR(){ocrFiles=[];ocrRows=[];renderOCRPreview();renderOCRRows();setOCRStatus('준비됨');updateOCRButtons();const note=document.querySelector('.speedup-total-note');if(note)note.textContent='스크린샷을 분석하면 공용/건설 가속권 총량이 위 입력칸에 자동 반영됩니다.';}
-$('speedupFiles').addEventListener('change',e=>{ocrFiles=[...e.target.files].filter(f=>f.type.startsWith('image/'));renderOCRPreview();setOCRStatus(`${ocrFiles.length}장 선택됨`);updateOCRButtons();});
-$('ocrAnalyze').addEventListener('click',async()=>{try{await analyzeSpeedupScreenshots();}catch(err){console.error(err);setOCRStatus('분석 실패');alert('OCR 분석 중 오류가 발생했습니다.\n'+(err?.message||err));}});$('ocrApply').addEventListener('click',applyOCRToCalculator);$('ocrClear').addEventListener('click',clearOCR);
-['dragenter','dragover'].forEach(evt=>$('dropzone').addEventListener(evt,e=>{e.preventDefault();$('dropzone').classList.add('drag');}));['dragleave','drop'].forEach(evt=>$('dropzone').addEventListener(evt,e=>{e.preventDefault();$('dropzone').classList.remove('drag');}));$('dropzone').addEventListener('drop',e=>{ocrFiles=[...e.dataTransfer.files].filter(f=>f.type.startsWith('image/'));renderOCRPreview();setOCRStatus(`${ocrFiles.length}장 선택됨`);updateOCRButtons();});
-try{const saved=JSON.parse(localStorage.getItem('wosSpeedupInventoryV5')||'[]');if(Array.isArray(saved)&&saved.length){ocrRows=saved;renderOCRRows();}}catch{}updateOCRButtons();
+function applyOCRToCalculator(){
+  if(!ocrRows.length){setOCRStatus('적용할 인식 결과가 없습니다');return;}
+  const g=totalByCat('general'),c=totalByCat('construction');
+  $('generalSpeedup').value=String(Math.round(g));$('constructionSpeedup').value=String(Math.round(c));
+  try{localStorage.setItem('wosSpeedupInventoryV6',JSON.stringify(ocrRows));}catch{}
+  render();
+  setOCRStatus(`적용 완료 · 건물 사용 가능 ${formatMinutes(g+c)}`);
+  const note=document.querySelector('.speedup-total-note');if(note)note.innerHTML=`✅ <strong>자동 입력 완료:</strong> 공용 ${formatMinutes(g)} + 건설 ${formatMinutes(c)} = 건물용 ${formatMinutes(g+c)}`;
+}
+function clearOCR(){
+  ocrFiles=[];ocrRows=[];
+  const input=$('speedupFiles');if(input)input.value='';
+  renderOCRPreview();renderOCRRows();setOCRStatus('준비됨');updateOCRButtons();
+  const note=document.querySelector('.speedup-total-note');if(note)note.textContent='스크린샷을 분석하면 공용/건설 가속권 총량이 위 입력칸에 자동 반영됩니다.';
+}
+$('speedupFiles').addEventListener('change',e=>setOCRFiles(e.target.files));
+$('speedupPick').addEventListener('click',e=>{e.preventDefault();e.stopPropagation();$('speedupFiles').click();});
+$('dropzone').addEventListener('click',e=>{if(!e.target.closest('#speedupPick')&&!ocrBusy)$('speedupFiles').click();});
+$('dropzone').addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&!ocrBusy){e.preventDefault();$('speedupFiles').click();}});
+$('ocrAnalyze').addEventListener('click',async()=>{try{await analyzeSpeedupScreenshots();}catch(err){console.error(err);setOCRStatus('분석 실패');alert('OCR 분석 중 오류가 발생했습니다.\n'+(err?.message||err));}});
+$('ocrApply').addEventListener('click',applyOCRToCalculator);$('ocrClear').addEventListener('click',clearOCR);
+['dragenter','dragover'].forEach(evt=>$('dropzone').addEventListener(evt,e=>{e.preventDefault();$('dropzone').classList.add('drag');}));
+['dragleave','drop'].forEach(evt=>$('dropzone').addEventListener(evt,e=>{e.preventDefault();$('dropzone').classList.remove('drag');}));
+$('dropzone').addEventListener('drop',e=>setOCRFiles(e.dataTransfer.files));
+try{const saved=JSON.parse(localStorage.getItem('wosSpeedupInventoryV6')||'[]');if(Array.isArray(saved)&&saved.length){ocrRows=saved;renderOCRRows();}}catch{}updateOCRButtons();
 </script>
 
 </body></html>
