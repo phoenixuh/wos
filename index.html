@@ -111,17 +111,17 @@ body:before{content:"";position:fixed;inset:0;pointer-events:none;opacity:.5;bac
 
       <div class="ocr-panel" id="ocrPanel">
         <div class="ocr-head">
-          <div><div class="ocr-title">📷 가속권 스크린샷 자동 인식 <span class="badge">V0.9.1 정밀분석</span></div><div class="ocr-sub">공용 · 건설 · 연구 · 훈련 · 치료 가속권을 종류/시간별로 인식해 계산기에 자동 입력합니다.</div></div>
+          <div><div class="ocr-title">📷 가속권 스크린샷 자동 인식 <span class="badge">V1.4 안정 업로드</span></div><div class="ocr-sub">공용 · 건설 · 연구 · 훈련 · 치료 가속권을 종류/시간별로 인식해 계산기에 자동 입력합니다.</div></div>
           <div id="ocrStatus" class="ocr-status">준비됨</div>
         </div>
-        <input id="speedupFiles" class="file-input" type="file" accept="image/*" multiple>
-        <label class="dropzone" id="dropzone" for="speedupFiles" aria-label="가속권 스크린샷 선택">
+        <input id="speedupFiles" class="file-input" type="file" accept="image/*" multiple aria-label="가속권 스크린샷 파일 선택">
+        <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="가속권 스크린샷 선택">
           <div class="drop-icon">📸</div>
           <div class="drop-main">가속권 스크린샷을 첨부하세요</div>
           <div class="drop-help">게임의 가방 → 가속 화면 전체 캡처 · 카드 수/행/열 제한 없음 · 여러 장 선택 가능</div>
-          <div class="drop-actions"><span class="btn primary upload-btn" id="speedupPick">📷 사진 선택</span></div>
+          <div class="drop-actions"><button type="button" class="btn primary upload-btn" id="speedupPick">📷 사진 선택</button></div>
           <div class="drop-help">PC에서는 이미지를 끌어놓을 수도 있습니다.</div>
-        </label>
+        </div>
         <div class="ocr-toolbar">
           <button type="button" class="btn ghost" id="ocrAnalyze" disabled>🔎 스크린샷 분석</button>
           <button type="button" class="btn ghost" id="ocrClear">첨부/인식 결과 지우기</button>
@@ -184,7 +184,7 @@ body:before{content:"";position:fixed;inset:0;pointer-events:none;opacity:.5;bac
       <div class="source">※ 건물 업그레이드에서는 공용 가속권 + 건설 가속권을 합산해 사용할 수 있다고 가정합니다. 스크린샷 OCR 결과는 적용 전 확인을 권장합니다. 실제 게임의 특정 버프/이벤트 적용 순서가 달라질 경우 계산 모듈에서 조정할 수 있습니다.</div>
     </section>
   </div>
-  <div class="footer">WOS Building Calculator KR · V0.9.1 · 독립 비공식 팬메이드 도구 · 게임사와 무관</div>
+  <div class="footer">WOS Building Calculator KR · V1.4 · 독립 비공식 팬메이드 도구 · 게임사와 무관</div>
 </div>
 
 <script>
@@ -384,216 +384,241 @@ fillSelects(); restore(); render();
 .ocr-v13-engine{margin-top:7px;color:#94a9c8;font-size:10px}
 </style>
 <script>
-/*
- V1.3: one OCR pass per screenshot + image templates for time/category.
- The previous V1.2 pipeline could invoke hundreds of OCR calls per image,
- which on mobile looked like an endless "recognizing text" loop.
+/* V1.4 stable OCR/upload controller
+   - Completely self-contained: no dependency on legacy V0.x/V1.x functions.
+   - File selection uses an actual button and a native <input type=file>.
+   - Multiple images supported.
+   - Analysis is intentionally conservative: one OCR pass per image, then results are shown;
+     future versions can replace only the parser without touching upload behavior.
 */
 (function(){
-  const panel=document.getElementById('ocrPanel');
-  let button=document.getElementById('ocrAnalyze');
-  if(!panel||!button)return;
+  'use strict';
+  const $ = (id) => document.getElementById(id);
+  const panel = $('ocrPanel');
+  const input = $('speedupFiles');
+  const pick = $('speedupPick');
+  const drop = $('dropzone');
+  const analyzeBtn = $('ocrAnalyze');
+  const clearBtn = $('ocrClear');
+  const applyBtn = $('ocrApply');
+  const preview = $('ocrPreview');
+  const results = $('ocrResults');
+  const tableBody = $('ocrTableBody');
+  const cardCount = $('ocrCardCount');
+  const generalTotal = $('ocrGeneralTotal');
+  const constructionTotal = $('ocrConstructionTotal');
+  const buildUsable = $('ocrBuildUsable');
+  const statusEl = $('ocrStatus');
+  if(!panel||!input||!pick||!drop||!analyzeBtn||!clearBtn||!applyBtn) return;
 
-  // Replace the existing handler-bearing button to remove every previous click listener.
-  const replacement=button.cloneNode(true); button.replaceWith(replacement); button=replacement;
-  button.textContent='🔬 스크린샷 분석';
+  const state={files:[],rows:[],busy:false};
+  let lastAppliedMinutes={general:0,construction:0};
 
-  const oldClear=document.getElementById('ocrClear');
-  if(oldClear){const n=oldClear.cloneNode(true);oldClear.replaceWith(n);n.addEventListener('click',clearOCRSafe);}
-  const oldApply=document.getElementById('ocrApply');
-  if(oldApply){const n=oldApply.cloneNode(true);oldApply.replaceWith(n);n.addEventListener('click',applyOCRSafe);}
+  function status(msg, mode){
+    statusEl.textContent=msg;
+    statusEl.style.color = mode==='error' ? 'var(--bad)' : mode==='busy' ? 'var(--ice)' : 'var(--muted)';
+  }
+  function safeHtml(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+  function formatNumber(n){return new Intl.NumberFormat('ko-KR').format(Number(n)||0);}
+  function minutesLabel(m){
+    m=Number(m)||0;
+    if(m===1)return '1분'; if(m===5)return '5분'; if(m===10)return '10분'; if(m===15)return '15분'; if(m===30)return '30분';
+    if(m%60===0)return (m/60)+'시간'; return m+'분';
+  }
+  function totalToLabel(minutes){
+    minutes=Math.max(0,Math.round(minutes));
+    const d=Math.floor(minutes/1440); minutes%=1440; const h=Math.floor(minutes/60); const m=minutes%60;
+    const out=[]; if(d)out.push(d+'일'); if(h)out.push(h+'시간'); if(m||!out.length)out.push(m+'분'); return out.join(' ');
+  }
+  function ensureErrorBox(){
+    let e=$('ocrV14Error');
+    if(!e){e=document.createElement('div');e.id='ocrV14Error';e.className='ocr-v13-error';panel.appendChild(e);}
+    return e;
+  }
+  function clearError(){const e=$('ocrV14Error');if(e)e.hidden=true;}
+  function showError(msg){const e=ensureErrorBox();e.hidden=false;e.textContent='오류: '+msg;}
 
-  const title=panel.querySelector('.ocr-title');
-  const note=document.createElement('div');
-  note.className='ocr-v13-note';
-  note.innerHTML='<strong>V1.3 빠른 분석 엔진</strong> · 스크린샷 1장당 전체 카드에서 OCR을 1회만 수행하고, 시간/가속권 종류는 이미지 패턴으로 판별합니다.';
-  const results=panel.querySelector('.ocr-results'); if(results)panel.insertBefore(note,results);
-
-  const toolbar=panel.querySelector('.ocr-toolbar');
-  if(toolbar&&!document.getElementById('ocrV13Progress')){
-    const prog=document.createElement('div');prog.className='ocr-v13-progress';prog.id='ocrV13Progress';prog.innerHTML='<i></i>';toolbar.after(prog);
+  function updateButtons(){
+    const hasFiles=state.files.length>0;
+    analyzeBtn.disabled=!hasFiles||state.busy;
+    clearBtn.disabled=state.busy;
+    applyBtn.disabled=state.rows.length===0||state.busy;
   }
 
-  let worker=null;
-  let workerPromise=null;
-  let destroyed=false;
-
-  function status(text,type){const e=document.getElementById('ocrStatus');if(!e)return;e.textContent=text;e.classList.remove('busy','error');if(type)e.classList.add(type);}
-  function progress(v){const box=document.getElementById('ocrV13Progress');if(!box)return;const bar=box.querySelector('i');box.style.display=v==null?'none':'block';if(bar)bar.style.width=Math.max(0,Math.min(100,v==null?0:v))+'%';}
-  function error(text){let e=document.getElementById('ocrV13Error');if(!e){e=document.createElement('div');e.id='ocrV13Error';e.className='ocr-v13-error';panel.appendChild(e);}e.hidden=false;e.textContent='오류: '+text;}
-  function clearError(){const e=document.getElementById('ocrV13Error');if(e)e.hidden=true;}
-
-  async function getWorker(){
-    if(worker)return worker;
-    if(workerPromise)return workerPromise;
-    workerPromise=(async()=>{
-      const T=await loadTesseract();
-      status('OCR 엔진 준비 중…','busy');
-      const w=await T.createWorker('kor+eng',1,{logger:m=>{
-        if(!ocrBusy)return;
-        // Do not expose the raw "recognizing text" message repeatedly; show a bounded percentage.
-        if(m&&typeof m.progress==='number'){
-          const p=Math.round(m.progress*100);
-          status(`OCR 엔진 처리 중 · ${p}%`,'busy');
-          progress(p);
-        }
-      }});
-      await w.setParameters({tessedit_pageseg_mode:'11',preserve_interword_spaces:'1'});
-      worker=w;workerPromise=null;return w;
-    })().catch(e=>{workerPromise=null;throw e;});
-    return workerPromise;
+  function renderPreview(){
+    preview.innerHTML='';
+    state.files.forEach((file,idx)=>{
+      const box=document.createElement('div');box.className='ocr-thumb';
+      const img=document.createElement('img');img.alt=file.name;
+      const tag=document.createElement('span');tag.textContent=(idx+1)+' · '+file.name;
+      const reader=new FileReader();reader.onload=()=>img.src=reader.result;reader.readAsDataURL(file);
+      box.append(img,tag);preview.appendChild(box);
+    });
   }
 
-  function withTimeout(promise,ms,label){
-    let timer;
-    const timeout=new Promise((_,rej)=>{timer=setTimeout(()=>rej(new Error(label+' 시간 초과')),ms);});
-    return Promise.race([promise,timeout]).finally(()=>clearTimeout(timer));
+  function setFiles(fileList){
+    const arr=Array.from(fileList||[]).filter(f=>f && f.type && f.type.startsWith('image/'));
+    state.files=arr;
+    state.rows=[];
+    renderPreview();
+    results.hidden=true;
+    clearError();
+    if(arr.length){status(arr.length+'장 첨부됨 · 분석할 준비 완료');}
+    else status('준비됨');
+    updateButtons();
   }
 
-  function getWords(data){
-    if(Array.isArray(data?.words)&&data.words.length)return data.words;
-    const out=[];
-    const seen=new Set();
-    function pushWords(node){
-      if(!node||typeof node!=='object')return;
-      if(Array.isArray(node.words))for(const w of node.words){if(w&&w.bbox){const k=JSON.stringify([w.text,w.bbox.x0,w.bbox.y0,w.bbox.x1,w.bbox.y1]);if(!seen.has(k)){seen.add(k);out.push(w);}}}
-      for(const k of ['blocks','paragraphs','lines'])if(Array.isArray(node[k]))for(const child of node[k])pushWords(child);
-    }
-    pushWords(data);return out;
+  // Native file chooser: this handler is synchronous and is fired directly by the user's click.
+  pick.addEventListener('click',(e)=>{e.preventDefault(); if(!state.busy) input.click();});
+  drop.addEventListener('click',(e)=>{
+    if(e.target===pick || pick.contains(e.target) || state.busy) return;
+    input.click();
+  });
+  drop.addEventListener('keydown',(e)=>{if(state.busy)return; if(e.key==='Enter'||e.key===' '){e.preventDefault();input.click();}});
+  input.addEventListener('change',()=>setFiles(input.files));
+
+  ['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,(e)=>{e.preventDefault();if(!state.busy)drop.classList.add('drag');}));
+  ['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,(e)=>{e.preventDefault();drop.classList.remove('drag');}));
+  drop.addEventListener('drop',(e)=>{if(state.busy)return;setFiles(e.dataTransfer.files);});
+
+  clearBtn.addEventListener('click',()=>{
+    state.files=[];state.rows=[];input.value='';renderPreview();results.hidden=true;lastAppliedMinutes={general:0,construction:0};clearError();status('첨부/인식 결과를 지웠습니다.');updateButtons();
+  });
+
+  function loadImage(file){return new Promise((resolve,reject)=>{const url=URL.createObjectURL(file);const img=new Image();img.onload=()=>{URL.revokeObjectURL(url);resolve(img)};img.onerror=()=>{URL.revokeObjectURL(url);reject(new Error('이미지를 불러오지 못했습니다: '+file.name));};img.src=url;});}
+
+  function loadTesseract(){
+    if(window.Tesseract) return Promise.resolve(window.Tesseract);
+    return new Promise((resolve,reject)=>{
+      const existing=document.querySelector('script[data-tesseract-loader]');
+      if(existing){existing.addEventListener('load',()=>resolve(window.Tesseract));existing.addEventListener('error',()=>reject(new Error('OCR 라이브러리를 불러오지 못했습니다.')));return;}
+      const s=document.createElement('script');s.dataset.tesseractLoader='1';s.src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';s.onload=()=>window.Tesseract?resolve(window.Tesseract):reject(new Error('Tesseract.js 로드에 실패했습니다.'));s.onerror=()=>reject(new Error('OCR 라이브러리 CDN 연결에 실패했습니다.'));document.head.appendChild(s);
+    });
   }
-  function wordBox(w){const b=w?.bbox;if(!b)return null;return{x0:Number(b.x0)||0,y0:Number(b.y0)||0,x1:Number(b.x1)||0,y1:Number(b.y1)||0};}
-  function wordText(w){return String(w?.text||'').replace(/\s+/g,'').trim();}
-  function numericText(s){
-    return String(s||'').replace(/[OoQ]/g,'0').replace(/[Il|]/g,'1').replace(/S/g,'5').replace(/B/g,'8').replace(/[^0-9,]/g,'').replace(/,+$/,'');
-  }
-  function numericValue(s){const n=numericText(s).replace(/,/g,'');if(!n)return null;const v=Number(n);return Number.isSafeInteger(v)&&v>=0&&v<=99999999?v:null;}
-  function knownDuration(text){
-    const t=String(text||'').replace(/\s+/g,'').replace(/[문늠]/g,'분').replace(/[시r]/g,'시');
-    const known=[['24시간',1440],['8시간',480],['3시간',180],['1시간',60],['30분',30],['15분',15],['10분',10],['5분',5],['1분',1]];
-    for(const [lab,min] of known)if(t.includes(lab))return{label:lab,minutes:min,confidence:.98};
+
+  function parseDurationText(text){
+    const s=String(text||'').replace(/\s+/g,'').replace(/시|시r/g,'시간').replace(/문|늠/g,'분');
+    const table=[['24시간',1440],['8시간',480],['3시간',180],['1시간',60],['30분',30],['15분',15],['10분',10],['5분',5],['1분',1]];
+    for(const [label,minutes] of table){if(s.includes(label))return{label,minutes};}
     return null;
   }
-  async function classifyDurationTemplate(card){
-    const crop=makeCanvas(card,card.width*.10,0,card.width*.82,card.height*.30,2);
-    const g=grayData(crop);let best=null;
-    for(const [label,url] of Object.entries(DURATION_TEMPLATES||{})){
-      try{const t=await loadTemplate(url);const d=imgDistance(g,t);if(!best||d<best.d)best={label,d};}catch{}
-    }
-    if(!best)return{label:'__unknown__',minutes:0,confidence:.1};
-    const min=speedupDurationMinutes(best.label);const conf=Math.max(.55,Math.min(.98,1-best.d*.55));
-    return{label:min>0?best.label:'__unknown__',minutes:min,confidence:conf,templateDistance:best.d};
-  }
-  async function classifyCategoryBetter(card){
-    const crop=makeCanvas(card,card.width*.00,card.height*.52,card.width*.48,card.height*.47,2);
-    const g=grayData(crop);let ranked=[];
-    for(const [key,urls] of Object.entries(CAT_TEMPLATES||{})){
-      let best=9;for(const u of (urls||[])){try{const t=await loadTemplate(u);best=Math.min(best,imgDistance(g,t));}catch{}}
-      ranked.push([key,best]);
-    }
-    ranked.sort((a,b)=>a[1]-b[1]);
-    if(!ranked.length)return{cat:'unknown',confidence:.1};
-    const best=ranked[0],second=ranked[1]||['unknown',best[1]+1];
-    const margin=Math.max(0,second[1]-best[1]);
-    // Template distances are normalized; a margin plus reasonable absolute distance gives stable classification.
-    const conf=Math.max(.35,Math.min(.98,.52+margin/(best[1]+.35)*.46));
-    return{cat:best[0],confidence:conf,score:best[1],secondScore:second[1]};
+  function normalizeCountText(text){
+    const t=String(text||'').replace(/[OoQD]/g,'0').replace(/[Il|]/g,'1').replace(/S/g,'5').replace(/B/g,'8');
+    const m=t.replace(/[^0-9,]/g,'').replace(/^,|,$/g,'');
+    if(!m)return null; const n=Number(m.replace(/,/g,''));
+    return Number.isSafeInteger(n)&&n>=0&&n<=99999999?n:null;
   }
 
-  function localCandidates(words,box,roi){
-    const out=[];for(const w of words){const b=wordBox(w);if(!b)continue;const x0=b.x0+roi.x,y0=b.y0+roi.y,x1=b.x1+roi.x,y1=b.y1+roi.y;const cx=(x0+x1)/2,cy=(y0+y1)/2;
-      if(cx<box.x||cx>box.x+box.w||cy<box.y||cy>box.y+box.h)continue;
-      const relX=(cx-box.x)/box.w,relY=(cy-box.y)/box.h;const txt=wordText(w);if(!txt)continue;
-      out.push({txt,b:{x0,y0,x1,y1},relX,relY,conf:Number(w.confidence??w.conf??0)||0});
-    }return out;
-  }
-  function chooseCount(cands){
-    const nums=cands.map(c=>({...c,n:numericValue(c.txt)})).filter(c=>c.n!==null&&c.relY>.64&&c.relX>.45);
-    if(!nums.length)return{count:0,confidence:.08,rawCount:''};
-    nums.sort((a,b)=>((b.conf/100)+(b.relX*.15)+(b.relY*.08))-((a.conf/100)+(a.relX*.15)+(a.relY*.08)));
-    const x=nums[0];return{count:x.n,confidence:Math.max(.2,Math.min(.98,(x.conf/100)*.85+.15)),rawCount:x.txt};
-  }
-  function chooseDurationFromWords(cands){
-    const ds=[];
-    for(const c of cands){if(c.relY>.02&&c.relY<.38){const d=knownDuration(c.txt);if(d)ds.push({...d,conf2:c.conf});}}
-    if(!ds.length)return null;ds.sort((a,b)=>(b.conf2||0)-(a.conf2||0));return ds[0];
+  function guessCategoryFromImage(img){
+    // Conservative visual heuristic: the icon area is lower-left of each tile.
+    // We intentionally return '미분류' unless the local color/brightness pattern is distinctive.
+    const c=document.createElement('canvas');const w=Math.max(1,Math.min(96,Math.round(img.width*.48)));const h=Math.max(1,Math.min(96,Math.round(img.height*.47)));c.width=w;c.height=h;const ctx=c.getContext('2d',{willReadFrequently:true});ctx.drawImage(img,0,img.height*.50,img.width*.48,img.height*.47,0,0,w,h);const d=ctx.getImageData(0,0,w,h).data;
+    let bright=0, blue=0, green=0, red=0, total=d.length/4;
+    for(let i=0;i<d.length;i+=4){const r=d[i],g=d[i+1],b=d[i+2];bright+=(r+g+b)/3;if(g>r*1.18&&g>b*.82)green++; if(b>r*1.25&&b>g*1.05)blue++; if(r>g*1.25&&r>b*1.15)red++;}
+    const br=bright/total;
+    // Only classify when evidence is reasonably strong; otherwise require user confirmation.
+    if(green/total>.22) return {label:'건설',confidence:.62};
+    if(blue/total>.28) return {label:'공용',confidence:.54};
+    if(red/total>.16) return {label:'훈련',confidence:.40};
+    return {label:'미분류',confidence:.15};
   }
 
-  async function analyzeImage(src,fileName,index,totalFiles){
-    const boxes=typeof detectCardBoxes==='function'?detectCardBoxes(src):[];
-    if(!boxes.length)return{rows:[],detected:0,boxes:[]};
-    // ROI around all detected cards. This avoids OCR'ing browser/status-bar noise on a phone screenshot.
-    const minX=Math.max(0,Math.min(...boxes.map(b=>b.x))-6),minY=Math.max(0,Math.min(...boxes.map(b=>b.y))-6);
-    const maxX=Math.min(src.width,Math.max(...boxes.map(b=>b.x+b.w))+6),maxY=Math.min(src.height,Math.max(...boxes.map(b=>b.y+b.h))+6);
-    const roi={x:minX,y:minY,w:maxX-minX,h:maxY-minY};
-    const ocrCanvas=makeCanvas(src,roi.x,roi.y,roi.w,roi.h,1.6);
-    const worker=await getWorker();
-    status(`${index+1}/${totalFiles} · 전체 카드 OCR 1회 처리 중…`,'busy');progress(0);
-    let result;
-    try{ result=await withTimeout(worker.recognize(ocrCanvas,{}, {blocks:true,tsv:true} ),90000,'전체 이미지 OCR'); }
-    catch(e){ try{await worker.terminate();}catch{} worker=null; workerPromise=null; throw e; }
-    const words=getWords(result?.data||{});
-    if(!words.length && result?.data?.tsv){
-      const lines=String(result.data.tsv).split(/\r?\n/);
-      for(const line of lines){
-        const parts=line.split('\t'); if(parts.length<12)continue;
-        const [level,page,block,par,lineNo,wordNo,left,top,width,height,conf,text]=parts;
-        if(Number(level)!==5 || !String(text||'').trim())continue;
-        const x0=Number(left),y0=Number(top),w=Number(width),h=Number(height);
-        if(Number.isFinite(x0)&&Number.isFinite(y0)&&Number.isFinite(w)&&Number.isFinite(h))words.push({text,bbox:{x0,y0,x1:x0+w,y1:y0+h},confidence:Number(conf)||0});
-      }
-    }
+  // Dynamic card detection without assuming a fixed number of rows/columns.
+  // It looks for repeated, similarly-sized bright rectangular card regions.
+  function detectCards(img){
+    const maxW=720, scale=Math.min(1,maxW/img.width), w=Math.max(1,Math.round(img.width*scale)), h=Math.max(1,Math.round(img.height*scale));
+    const c=document.createElement('canvas');c.width=w;c.height=h;const ctx=c.getContext('2d',{willReadFrequently:true});ctx.drawImage(img,0,0,w,h);const p=ctx.getImageData(0,0,w,h).data;
+    const bw=Math.max(70,Math.round(w*.12)), bh=Math.max(70,Math.round(h*.09));
+    const stepX=Math.max(18,Math.round(bw*.22)), stepY=Math.max(18,Math.round(bh*.22));
+    const candidates=[];
+    for(let y=0;y+bh<=h;y+=stepY){for(let x=0;x+bw<=w;x+=stepX){
+      let bright=0,blueish=0; const samples=[];
+      for(let sy=0;sy<bh;sy+=Math.max(4,Math.floor(bh/12))){for(let sx=0;sx<bw;sx+=Math.max(4,Math.floor(bw/12))){const i=((y+sy)*w+(x+sx))*4;const r=p[i],g=p[i+1],b=p[i+2];const v=(r+g+b)/3;bright+=v; if(b>r*1.08&&b>g*.92)blueish++;samples.push(v);}}
+      const n=samples.length, avg=bright/n;
+      if(avg>70 && avg<220 && blueish/n>.42)candidates.push({x:x/scale,y:y/scale,w:bw/scale,h:bh/scale,score:(blueish/n)+avg/800});
+    }}
+    // Non-maximum suppression + shape/size clustering.
+    candidates.sort((a,b)=>b.score-a.score);const keep=[];
+    function iou(a,b){const x=Math.max(a.x,b.x),y=Math.max(a.y,b.y),r=Math.min(a.x+a.w,b.x+b.w),bt=Math.min(a.y+a.h,b.y+b.h);const inter=Math.max(0,r-x)*Math.max(0,bt-y);const uni=a.w*a.h+b.w*b.h-inter;return uni?inter/uni:0;}
+    for(const cnd of candidates){if(keep.some(k=>iou(k,cnd)>.35))continue;keep.push(cnd);if(keep.length>=60)break;}
+    // Cluster x/y to remove accidental tiny detections; retain cards roughly matching first cluster size.
+    if(!keep.length)return [];
+    const medW=keep.slice().sort((a,b)=>a.w-b.w)[Math.floor(keep.length/2)].w;
+    const medH=keep.slice().sort((a,b)=>a.h-b.h)[Math.floor(keep.length/2)].h;
+    const filtered=keep.filter(k=>Math.abs(k.w-medW)/medW<.35&&Math.abs(k.h-medH)/medH<.35);
+    filtered.sort((a,b)=>a.y-b.y||a.x-b.x);
+    return filtered;
+  }
+
+  function crop(img,box,scale=2){const c=document.createElement('canvas');c.width=Math.max(1,Math.round(box.w*scale));c.height=Math.max(1,Math.round(box.h*scale));c.getContext('2d').drawImage(img,box.x,box.y,box.w,box.h,0,0,c.width,c.height);return c;}
+
+  async function analyzeOne(file,idx,total,worker){
+    const img=await loadImage(file);const cards=detectCards(img);
+    status(`${idx+1}/${total} · 전체 이미지 OCR 1회 처리 중…`,'busy');
+    const cropBox=cards.length?{x:Math.max(0,Math.min(...cards.map(c=>c.x))-8),y:Math.max(0,Math.min(...cards.map(c=>c.y))-8),w:Math.min(img.width,Math.max(...cards.map(c=>c.x+c.w))+8)-Math.max(0,Math.min(...cards.map(c=>c.x))-8),h:Math.min(img.height,Math.max(...cards.map(c=>c.y+c.h))+8)-Math.max(0,Math.min(...cards.map(c=>c.y))-8)}:{x:0,y:0,w:img.width,h:img.height};
+    const canvas=crop(img,cropBox,1.6);
+    const result=await Promise.race([worker.recognize(canvas),new Promise((_,rej)=>setTimeout(()=>rej(new Error('OCR 90초 시간 초과')),90000))]);
+    const words=(result?.data?.words||[]).filter(w=>String(w.text||'').trim());
     const rows=[];
-    for(let i=0;i<boxes.length;i++){
-      const b=boxes[i];
-      const rel={x:(b.x-roi.x)*1.6,y:(b.y-roi.y)*1.6,w:b.w*1.6,h:b.h*1.6};
-      const cands=localCandidates(words,rel,{x:0,y:0});
-      // word coordinates in OCR are already scaled because OCR canvas is 1.6x.
-      const cnt=chooseCount(cands);
-      let dur=chooseDurationFromWords(cands);
-      const card=makeCanvas(src,b.x,b.y,b.w,b.h,1.0);
-      if(!dur)dur=await classifyDurationTemplate(card);
-      const cat=await classifyCategoryBetter(card);
-      const rawDur=cands.filter(c=>c.relY>.02&&c.relY<.38).map(c=>c.txt).join(' ');
-      const rawCnt=cands.filter(c=>c.relY>.64&&c.relX>.45).map(c=>c.txt).join(' ');
-      rows.push({cat:cat.cat||'unknown',label:dur?.label||'__unknown__',minutes:Number(dur?.minutes)||0,count:Number(cnt?.count)||0,
-        confidence:Math.max(.05,Math.min(.99,.46*(Number(cnt?.confidence)||0)+.34*(Number(dur?.confidence)||0)+.20*(Number(cat?.confidence)||0))),
-        source:fileName,rawCount:cnt.rawCount||rawCnt||'',rawDuration:dur.rawDuration||rawDur||'',box:b});
-      status(`${index+1}/${totalFiles} · 카드 ${i+1}/${boxes.length} 결과 정리 중…`,'busy');
-      progress(Math.round(((i+1)/boxes.length)*100));
+    for(let i=0;i<cards.length;i++){
+      const b=cards[i];const rel={x:(b.x-cropBox.x)*1.6,y:(b.y-cropBox.y)*1.6,w:b.w*1.6,h:b.h*1.6};
+      const local=words.filter(w=>{const bb=w.bbox||{};const cx=((bb.x0||0)+(bb.x1||0))/2,cy=((bb.y0||0)+(bb.y1||0))/2;return cx>=rel.x&&cx<=rel.x+rel.w&&cy>=rel.y&&cy<=rel.y+rel.h;});
+      const durCandidates=[];const countCandidates=[];
+      for(const w of local){const text=String(w.text||'').trim();const d=parseDurationText(text);const bb=w.bbox||{};const rx=((bb.x0||0)+((bb.x1||0)-(bb.x0||0))/2-rel.x)/rel.w;const ry=((bb.y0||0)+((bb.y1||0)-(bb.y0||0))/2-rel.y)/rel.h;if(d&&ry<.45)durCandidates.push({d,conf:Number(w.confidence)||0});if(ry>.58&&rx>.38){const n=normalizeCountText(text);if(n!==null)countCandidates.push({n,conf:Number(w.confidence)||0});}}
+      durCandidates.sort((a,b)=>b.conf-a.conf);countCandidates.sort((a,b)=>b.conf-a.conf);
+      const dur=durCandidates[0]?.d||null;const count=countCandidates[0]?.n ?? null;const cat=guessCategoryFromImage(img);
+      rows.push({category:cat.label,time:dur?.label||'미인식',minutes:dur?.minutes||0,count:count??0,confidence:Math.round(((dur?Math.min(1,(durCandidates[0]?.conf||40)/100):.25)*.35+(count!==null?Math.min(1,(countCandidates[0]?.conf||40)/100):.20)*.45+cat.confidence*.20)*100),source:file.name});
+      status(`${idx+1}/${total} · 카드 ${i+1}/${cards.length} 결과 정리 중…`,'busy');
     }
-    return{rows,detected:boxes.length,boxes};
+    return rows;
   }
 
-  async function analyze(){
-    if(!ocrFiles.length||ocrBusy)return;
-    ocrBusy=true;clearError();ocrRows=[];renderOCRRows();button.disabled=true;progress(0);status('분석 준비 중…','busy');
+  function renderRows(){
+    const merged={};
+    for(const r of state.rows){const key=r.category+'|'+r.time;merged[key]=merged[key]||{category:r.category,time:r.time,minutes:r.minutes,count:0,confidence:0,samples:0};merged[key].count+=Number(r.count)||0;merged[key].confidence+=r.confidence;merged[key].samples++;}
+    const rows=Object.values(merged).map(r=>({...r,confidence:Math.round(r.confidence/r.samples)}));
+    tableBody.innerHTML=rows.map(r=>`<tr><td data-label="분류"><select class="ocr-edit" data-k="category"><option ${r.category==='공용'?'selected':''}>공용</option><option ${r.category==='건설'?'selected':''}>건설</option><option ${r.category==='훈련'?'selected':''}>훈련</option><option ${r.category==='연구'?'selected':''}>연구</option><option ${r.category==='치료'?'selected':''}>치료</option><option ${r.category==='미분류'?'selected':''}>미분류</option></select></td><td data-label="시간"><select class="ocr-edit" data-k="minutes"><option value="1" ${r.minutes===1?'selected':''}>1분</option><option value="5" ${r.minutes===5?'selected':''}>5분</option><option value="10" ${r.minutes===10?'selected':''}>10분</option><option value="15" ${r.minutes===15?'selected':''}>15분</option><option value="30" ${r.minutes===30?'selected':''}>30분</option><option value="60" ${r.minutes===60?'selected':''}>1시간</option><option value="180" ${r.minutes===180?'selected':''}>3시간</option><option value="480" ${r.minutes===480?'selected':''}>8시간</option><option value="1440" ${r.minutes===1440?'selected':''}>24시간</option><option value="0" ${!r.minutes?'selected':''}>미인식</option></select></td><td data-label="수량"><input class="ocr-edit" type="number" min="0" step="1" value="${Number(r.count)||0}" data-k="count"></td><td data-label="환산">${r.minutes?totalToLabel((r.minutes*Number(r.count||0))):'-'}</td><td data-label="신뢰도"><span class="ocr-confidence ${r.confidence>=80?'conf-good':r.confidence>=55?'conf-check':'conf-low'}">${r.confidence}%</span></td></tr>`).join('');
+    cardCount.textContent=state.rows.length+'개';
+    const general=state.rows.filter(r=>r.category==='공용').reduce((a,r)=>a+r.minutes*r.count,0);
+    const construction=state.rows.filter(r=>r.category==='건설').reduce((a,r)=>a+r.minutes*r.count,0);
+    generalTotal.textContent=totalToLabel(general);constructionTotal.textContent=totalToLabel(construction);buildUsable.textContent=totalToLabel(general+construction);
+    results.hidden=state.rows.length===0;
+  }
+
+  analyzeBtn.addEventListener('click',async()=>{
+    if(state.busy||!state.files.length)return;
+    state.busy=true;state.rows=[];clearError();renderRows();updateButtons();status('OCR 엔진 준비 중…','busy');
+    let worker=null;
     try{
-      const files=ocrFiles.slice();let detectedTotal=0;let firstSrc=null,firstBoxes=[];
-      for(let i=0;i<files.length;i++){
-        const src=await loadImage(files[i]);if(i===0)firstSrc=src;
-        const r=await analyzeImage(src,files[i].name,i,files.length);detectedTotal+=r.detected;ocrRows.push(...r.rows);if(i===0)firstBoxes=r.boxes||[];renderOCRRows();
+      const T=await loadTesseract();
+      worker=await T.createWorker('kor+eng',1,{logger:m=>{if(m&&typeof m.progress==='number'){const p=Math.round(m.progress*100);status(`OCR 엔진 처리 중 · ${p}%`,'busy');}}});
+      for(let i=0;i<state.files.length;i++){
+        const rows=await analyzeOne(state.files[i],i,state.files.length,worker);state.rows.push(...rows);renderRows();
       }
-      const usable=ocrRows.filter(r=>r.cat!=='unknown'&&r.minutes>0&&r.count>0).length;
-      const need=ocrRows.length-usable;
-      status(`완료 · ${detectedTotal}개 카드 탐지 · ${usable}개 인식 · ${need}개 확인 필요`,'');progress(100);renderOCRRows();
-      if(document.getElementById('ocrDebug')?.checked&&firstSrc&&typeof drawDebug==='function')drawDebug(firstSrc,firstBoxes,ocrRows.slice(0,firstBoxes.length));
-    }catch(e){console.error(e);status('분석 실패 · 오류를 확인하세요','error');error(e?.message||String(e));}
-    finally{ocrBusy=false;updateOCRButtons();setTimeout(()=>progress(null),500);}
-  }
+      status(`완료 · ${state.rows.length}개 카드 결과 생성`);
+      updateButtons();
+    }catch(e){showError(e?.message||String(e));status('분석 실패 · 오류를 확인하세요','error');}
+    finally{if(worker){try{await worker.terminate();}catch{}}state.busy=false;updateButtons();}
+  });
 
-  function clearOCRSafe(){
-    clearOCR();clearError();progress(null);
-  }
-  function applyOCRSafe(){
-    applyOCRToCalculator();
-  }
+  applyBtn.addEventListener('click',()=>{
+    const general=state.rows.filter(r=>r.category==='공용').reduce((a,r)=>a+r.minutes*r.count,0);
+    const construction=state.rows.filter(r=>r.category==='건설').reduce((a,r)=>a+r.minutes*r.count,0);
+    if($('generalSpeedup'))$('generalSpeedup').value=String(general);
+    if($('constructionSpeedup'))$('constructionSpeedup').value=String(construction);
+    lastAppliedMinutes={general,construction};
+    if(typeof render==='function')render();
+    status(`계산기 적용 완료 · 공용 ${totalToLabel(general)} · 건설 ${totalToLabel(construction)}`);
+  });
 
-  button.addEventListener('click',()=>analyze());
-  // Prevent a click on the drop-zone from doing anything while analysis is running, but leave normal label behavior intact.
-  const dz=document.getElementById('dropzone');if(dz)dz.addEventListener('click',e=>{if(ocrBusy){e.preventDefault();e.stopPropagation();}});
-  document.getElementById('speedupFiles')?.addEventListener('change',e=>{setOCRFiles(e.target.files);clearError();});
-  window.wosV13StopOCR=()=>{destroyed=true;if(worker){try{worker.terminate();}catch{}worker=null;}workerPromise=null;};
-  updateOCRButtons();
+  // Keep legacy helper names available for other UI code, but all upload state is owned here.
+  window.setOCRFiles=(files)=>setFiles(files);
+  window.updateOCRButtons=updateButtons;
+  window.clearOCR=()=>{state.files=[];state.rows=[];input.value='';renderPreview();results.hidden=true;clearError();status('준비됨');updateButtons();};
+  window.applyOCRToCalculator=()=>applyBtn.click();
+  window.renderOCRRows=renderRows;
+
+  updateButtons();
 })();
 </script>
 
