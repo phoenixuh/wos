@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0b1530">
+<title>WOS 건물 계산기 KR · 개선판</title>
+<style>
+:root{
+  --bg:#071224; --bg2:#0d1a33; --panel:rgba(15,30,57,.94); --panel2:rgba(20,41,76,.92);
+  --line:#2b4168; --line2:#395784; --text:#eef6ff; --muted:#9eb2d2;
+  --ice:#8de8ff; --ice2:#4fbfe8; --gold:#ffd76b; --good:#68e0b0; --bad:#ff7777;
+  --purple:#c2a1ff; --shadow:0 22px 55px rgba(0,0,0,.35);
+}
+*{box-sizing:border-box}
+body{margin:0;color:var(--text);font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans KR",sans-serif;line-height:1.45;background:
+  radial-gradient(circle at 15% 5%,rgba(92,195,255,.16),transparent 25%),
+  radial-gradient(circle at 90% 10%,rgba(164,115,255,.12),transparent 26%),
+  linear-gradient(155deg,#061020,#0b1730 46%,#061020);min-height:100vh}
+body:before{content:"";position:fixed;inset:0;pointer-events:none;opacity:.5;background-image:radial-gradient(circle at 20% 30%,rgba(255,255,255,.18) 0 1px,transparent 1px),radial-gradient(circle at 70% 18%,rgba(255,255,255,.12) 0 1px,transparent 1px),radial-gradient(circle at 40% 80%,rgba(255,255,255,.12) 0 1px,transparent 1px);background-size:140px 140px,220px 220px,180px 180px}
+.container{max-width:1320px;margin:auto;padding:18px 18px 56px;position:relative}
+.hero{display:flex;justify-content:space-between;align-items:end;gap:18px;margin:12px 0 20px;padding:18px 6px}
+.hero-title{display:flex;align-items:center;gap:14px}
+.hero-crystal{width:52px;height:52px;border-radius:16px;display:grid;place-items:center;font-size:28px;background:linear-gradient(145deg,rgba(126,229,255,.2),rgba(120,100,255,.14));border:1px solid rgba(141,232,255,.45);box-shadow:0 0 35px rgba(79,191,232,.16),inset 0 0 22px rgba(141,232,255,.09)}
+.hero h1{font-size:clamp(26px,4vw,42px);margin:0;letter-spacing:-.04em} .hero p{margin:4px 0 0;color:var(--muted);font-size:14px}
+.status-pill{padding:8px 12px;border-radius:999px;background:rgba(104,224,176,.08);border:1px solid rgba(104,224,176,.28);color:var(--good);font-weight:700;font-size:12px;white-space:nowrap}
+.layout{display:grid;grid-template-columns:minmax(0,1.02fr) minmax(0,.98fr);gap:18px;align-items:start}
+.panel{background:linear-gradient(180deg,rgba(17,33,62,.95),rgba(10,23,45,.95));border:1px solid var(--line);border-radius:22px;box-shadow:var(--shadow);padding:18px}
+.panel h2{margin:0 0 14px;font-size:18px;letter-spacing:-.02em} .panel h3{margin:18px 0 10px;font-size:14px;color:#cfe0fb}
+.section-label{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px}
+.badge{font-size:11px;color:var(--muted);padding:5px 8px;border-radius:999px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06)}
+.building-card{position:relative;overflow:hidden;border:1px solid rgba(141,232,255,.24);border-radius:18px;padding:15px;background:linear-gradient(135deg,rgba(47,101,152,.18),rgba(48,35,92,.15))}
+.building-card:after{content:"";position:absolute;right:-34px;top:-54px;width:130px;height:130px;transform:rotate(35deg);background:linear-gradient(135deg,transparent 35%,rgba(141,232,255,.09) 36%,transparent 57%)}
+.building-main{display:flex;align-items:center;gap:12px} .building-icon{width:50px;height:50px;border-radius:15px;display:grid;place-items:center;font-size:27px;background:rgba(5,16,34,.55);border:1px solid rgba(141,232,255,.2)}
+.building-name{font-weight:800;font-size:17px} .subtle{color:var(--muted);font-size:12px}
+.level-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.field{display:flex;flex-direction:column;gap:6px} .field label{font-size:12px;color:#c9d9f2}
+.field input,.field select{width:100%;padding:11px 12px;border-radius:12px;border:1px solid var(--line);background:#08162b;color:var(--text);outline:none;font-size:14px}
+.field input:focus,.field select:focus{border-color:var(--ice);box-shadow:0 0 0 3px rgba(141,232,255,.1)}
+.quick-levels{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px} .chip{border:1px solid var(--line);background:rgba(255,255,255,.03);color:#cfdef2;padding:7px 10px;border-radius:999px;font-size:11px;cursor:pointer} .chip:hover{border-color:var(--ice);color:#fff}
+.input-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.input-card{padding:12px;border:1px solid rgba(57,87,132,.72);background:rgba(4,14,28,.38);border-radius:14px}
+.input-card .title{display:flex;justify-content:space-between;align-items:center;margin-bottom:7px} .icon{font-size:18px} .unit{font-size:11px;color:var(--muted)}
+.buttons{display:flex;flex-wrap:wrap;gap:9px;margin-top:14px} .btn{border:0;border-radius:12px;padding:11px 14px;background:var(--panel2);color:var(--text);cursor:pointer;font-weight:750} .btn.primary{background:linear-gradient(135deg,#73d9fb,#76e2bb);color:#06111f;box-shadow:0 8px 24px rgba(85,210,225,.12)} .btn.ghost{border:1px solid var(--line);background:rgba(255,255,255,.02)} .btn:active{transform:translateY(1px)}
+.note{padding:11px 12px;border-left:3px solid var(--gold);background:rgba(255,215,107,.06);color:#dce6f5;border-radius:9px;font-size:12px;margin-top:12px}
+.metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin-bottom:12px} .metric{padding:13px;border-radius:15px;background:#09172d;border:1px solid var(--line);min-width:0} .metric .k{font-size:11px;color:var(--muted)} .metric .v{font-size:18px;font-weight:850;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis} .metric.good .v{color:var(--good)} .metric.bad .v{color:var(--bad)} .metric.gold .v{color:var(--gold)}
+.callout{padding:13px 14px;margin:10px 0 14px;border-radius:15px;border:1px solid rgba(141,232,255,.24);background:linear-gradient(90deg,rgba(141,232,255,.08),rgba(194,161,255,.05))}
+.callout strong{font-size:14px} .callout .subtle{margin-top:3px}
+.progress-wrap{display:grid;gap:9px;margin-bottom:14px} .progress-row{display:grid;grid-template-columns:92px 1fr 78px;gap:9px;align-items:center} .progress-label{font-size:12px;color:#c5d7ef} .progress-bar{height:10px;background:#071125;border:1px solid #223758;border-radius:999px;overflow:hidden} .progress-fill{height:100%;border-radius:999px;background:linear-gradient(90deg,#4fbfe8,#7de4c0)} .progress-fill.bad{background:linear-gradient(90deg,#ff7d7d,#ffb26b)} .progress-value{text-align:right;font-size:11px;color:var(--muted)}
+.tabs{display:flex;gap:7px;margin-bottom:10px} .tab{border:1px solid var(--line);background:rgba(255,255,255,.02);color:#bdd0eb;border-radius:10px;padding:7px 10px;font-size:11px;cursor:pointer} .tab.active{background:rgba(141,232,255,.12);color:#fff;border-color:rgba(141,232,255,.42)}
+.table-wrap{overflow:auto;border:1px solid var(--line);border-radius:14px} table{width:100%;border-collapse:collapse;min-width:720px} th,td{padding:9px 10px;border-bottom:1px solid rgba(43,65,104,.58);text-align:right;font-size:11px} th{color:#c5d7ef;background:#09172d;position:sticky;top:0} th:first-child,td:first-child{text-align:left} tr:last-child td{border-bottom:0}
+.enough{color:var(--good);font-weight:800} .shortage{color:var(--bad);font-weight:800} .gold{color:var(--gold);font-weight:800}
+.plan-box{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0} .plan-item{padding:12px;border-radius:14px;border:1px solid var(--line);background:rgba(5,15,29,.42)} .plan-item .big{font-size:17px;font-weight:850;margin-top:2px}
+.source{margin-top:13px;color:#7f95b9;font-size:11px;line-height:1.6} .source a{color:#9edcff} .footer{margin-top:16px;color:#7086ab;font-size:11px;text-align:center}
+@media(max-width:1080px){.layout{grid-template-columns:1fr}}
+@media(max-width:760px){.hero{align-items:flex-start;flex-direction:column}.metrics{grid-template-columns:repeat(2,1fr)} .progress-row{grid-template-columns:76px 1fr 72px}}
+@media(max-width:580px){.container{padding:10px 10px 40px}.panel{padding:13px;border-radius:18px}.level-row,.input-grid,.plan-box{grid-template-columns:1fr}.metrics{grid-template-columns:1fr 1fr}.btn{flex:1 1 auto}.hero-crystal{width:44px;height:44px}}
+</style>
+</head>
+<body>
+<div class="container">
+  <header class="hero">
+    <div class="hero-title"><div class="hero-crystal">❄️</div><div><h1>화이트아웃 서바이벌<br>건물 업그레이드 계산기</h1><p>한국 유저용 개선판 · PC / 모바일 반응형 · 자원·가속권까지 한 번에 계산</p></div></div>
+    <div class="status-pill">● 팬메이드 도구 · V0.2</div>
+  </header>
+
+  <div class="layout">
+    <section class="panel">
+      <div class="section-label"><h2>🏗️ 업그레이드 설정</h2><span class="badge">현재 지원: 용광로</span></div>
+      <div class="building-card">
+        <div class="building-main"><div class="building-icon">🔥</div><div><div class="building-name">용광로</div><div class="subtle">Lv.1 ~ FC10 · 다음 목표까지 연속 계산</div></div></div>
+        <div class="level-row">
+          <div class="field"><label>현재 레벨</label><select id="fromLevel"></select></div>
+          <div class="field"><label>목표 레벨</label><select id="toLevel"></select></div>
+        </div>
+        <div class="quick-levels">
+          <button class="chip" data-range="20-25">20 → 25</button><button class="chip" data-range="24-26">24 → 26</button><button class="chip" data-range="25-30">25 → 30</button><button class="chip" data-range="30-fc5">30 → FC5</button><button class="chip" data-range="30-fc10">30 → FC10</button>
+        </div>
+      </div>
+
+      <h3>⚡ 건설 속도 / 버프</h3>
+      <div class="input-grid">
+        <div class="input-card"><div class="title"><span>현재 건설 속도</span><span class="unit">%</span></div><input id="constructionSpeed" value="0" inputmode="decimal"><div class="subtle">현재 이미 적용 중인 효과</div></div>
+        <div class="input-card"><div class="title"><span>추가 건설 버프</span><span class="unit">%</span></div><input id="extraBuild" value="0" inputmode="decimal"><div class="subtle">이번 업그레이드에 켤 버프</div></div>
+        <div class="input-card"><div class="title"><span>진먼 자원 절감</span><span class="unit">%</span></div><input id="zinman" value="0" inputmode="decimal"><div class="subtle">자원 비용에만 적용</div></div>
+        <div class="input-card"><div class="title"><span>추가 시간 감소</span><span class="unit">%</span></div><input id="doubleTime" value="0" inputmode="decimal"><div class="subtle">더블 타임 등 별도 감소분</div></div>
+      </div>
+
+      <h3>🎒 현재 보유 자원</h3>
+      <div class="input-grid">
+        <div class="input-card"><div class="title"><span>🍖 고기</span><span class="unit">숫자 / K·M·B / 억·만</span></div><input id="meat" placeholder="예: 1.5b"></div>
+        <div class="input-card"><div class="title"><span>🪵 나무</span><span class="unit">숫자 / K·M·B / 억·만</span></div><input id="wood" placeholder="예: 2.0B"></div>
+        <div class="input-card"><div class="title"><span>🪨 석탄</span><span class="unit">숫자 / K·M·B / 억·만</span></div><input id="coal" placeholder="예: 850m"></div>
+        <div class="input-card"><div class="title"><span>⛓️ 철</span><span class="unit">숫자 / K·M·B / 억·만</span></div><input id="iron" placeholder="예: 4,300,000"></div>
+      </div>
+      <div class="buttons"><button class="btn ghost" id="preset1">예시 자원 넣기</button><button class="btn ghost" id="clearResources">자원만 비우기</button></div>
+
+      <h3>⏱️ 보유 가속권 / 재화</h3>
+      <div class="input-grid">
+        <div class="input-card"><div class="title"><span>⏩ 일반 가속권</span><span class="unit">분</span></div><input id="generalSpeedup" placeholder="예: 2500"></div>
+        <div class="input-card"><div class="title"><span>🏗️ 건설 가속권</span><span class="unit">분</span></div><input id="constructionSpeedup" placeholder="예: 1200"></div>
+        <div class="input-card"><div class="title"><span>🔷 불의 수정</span><span class="unit">개</span></div><input id="fireCrystal" placeholder="예: 300"></div>
+        <div class="input-card"><div class="title"><span>💠 정제 불의 수정</span><span class="unit">개</span></div><input id="refinedFC" placeholder="예: 50"></div>
+      </div>
+
+      <div class="buttons"><button class="btn primary" id="calc">계산하기</button><button class="btn ghost" id="copy">결과 복사</button><button class="btn ghost" id="reset">초기화</button></div>
+      <div class="note">💡 <b>개선 포인트:</b> 1.5b / 850M / 1.2억 / 15,000,000을 자동 인식하고, 내 보유량 기준으로 <b>어디까지 업그레이드 가능한지</b>와 <b>가속권 부족분</b>까지 함께 계산합니다.</div>
+      <div class="source">데이터 구조는 별도 모듈로 분리되어 이후 대사관·연구센터·아카데미·병원·지휘부·병종 건물 데이터를 추가하기 쉽게 구성했습니다.</div>
+    </section>
+
+    <section class="panel">
+      <div class="section-label"><h2>📊 계산 결과</h2><span id="resultBadge" class="badge">대기 중</span></div>
+      <div class="metrics">
+        <div class="metric"><div class="k">총 기본 건설시간</div><div id="totalTime" class="v">-</div></div>
+        <div class="metric"><div class="k">버프 적용 후</div><div id="effectiveTime" class="v">-</div></div>
+        <div class="metric gold"><div class="k">필요 가속시간</div><div id="speedNeed" class="v">-</div></div>
+        <div class="metric" id="maxMetric"><div class="k">자원 기준 가능 레벨</div><div id="maxReach" class="v">-</div></div>
+      </div>
+
+      <div class="callout"><strong id="headline">업그레이드 구간을 선택하세요.</strong><div id="summary" class="subtle">목표를 계산하면 전체 구간과 부족한 자원이 바로 표시됩니다.</div></div>
+
+      <div class="section-label"><h3>🧭 어디까지 갈 수 있나?</h3><span class="subtle">입력한 자원 기준</span></div>
+      <div id="reachInfo" class="plan-box">
+        <div class="plan-item"><div class="subtle">현재 레벨</div><div id="reachCurrent" class="big">-</div></div>
+        <div class="plan-item"><div class="subtle">자원으로 가능한 최대</div><div id="reachTarget" class="big">-</div></div>
+      </div>
+
+      <h3>📦 자원 충족도</h3>
+      <div id="progressWrap" class="progress-wrap"></div>
+
+      <h3>⏩ 가속권 사용 계획</h3>
+      <div id="speedPlan" class="plan-box"></div>
+
+      <div class="tabs"><button class="tab active" data-tab="detail">단계별 내역</button><button class="tab" data-tab="cumulative">누적 내역</button></div>
+      <div class="table-wrap"><table><thead id="tableHead"></thead><tbody id="detailTable"></tbody></table></div>
+
+      <div class="source">※ 일반 가속권 + 건설 가속권을 모두 해당 건설에 사용할 수 있다고 가정해 합산 계산합니다. 실제 게임의 특정 버프/이벤트 적용 순서가 달라질 경우 계산 모듈에서 조정할 수 있습니다.</div>
+    </section>
+  </div>
+  <div class="footer">WOS Building Calculator KR · V0.2 · 독립 비공식 팬메이드 도구 · 게임사와 무관</div>
+</div>
+
+<script>
+const DATA = [
+ {id:'1',label:'Lv.1',meat:0,wood:0,coal:0,iron:0,fc:0,rfc:0,time:0},
+ {id:'2',label:'Lv.2',meat:0,wood:180,coal:0,iron:0,fc:0,rfc:0,time:6},
+ {id:'3',label:'Lv.3',meat:0,wood:805,coal:0,iron:0,fc:0,rfc:0,time:60},
+ {id:'4',label:'Lv.4',meat:0,wood:1800,coal:360,iron:0,fc:0,rfc:0,time:180},
+ {id:'5',label:'Lv.5',meat:0,wood:7600,coal:1500,iron:0,fc:0,rfc:0,time:600},
+ {id:'6',label:'Lv.6',meat:0,wood:19000,coal:3800,iron:960,fc:0,rfc:0,time:1800},
+ {id:'7',label:'Lv.7',meat:0,wood:69000,coal:13000,iron:3400,fc:0,rfc:0,time:3600},
+ {id:'8',label:'Lv.8',meat:0,wood:120000,coal:25000,iron:6300,fc:0,rfc:0,time:9000},
+ {id:'9',label:'Lv.9',meat:0,wood:260000,coal:52000,iron:13000,fc:0,rfc:0,time:16200},
+ {id:'10',label:'Lv.10',meat:0,wood:460000,coal:92000,iron:23000,fc:0,rfc:0,time:21600},
+ {id:'11',label:'Lv.11',meat:1300000,wood:1300000,coal:260000,iron:65000,fc:0,rfc:0,time:27000},
+ {id:'12',label:'Lv.12',meat:1600000,wood:1600000,coal:330000,iron:84000,fc:0,rfc:0,time:32400},
+ {id:'13',label:'Lv.13',meat:2300000,wood:2300000,coal:470000,iron:110000,fc:0,rfc:0,time:39600},
+ {id:'14',label:'Lv.14',meat:3100000,wood:3100000,coal:640000,iron:150000,fc:0,rfc:0,time:50400},
+ {id:'15',label:'Lv.15',meat:4600000,wood:4600000,coal:930000,iron:230000,fc:0,rfc:0,time:64800},
+ {id:'16',label:'Lv.16',meat:5900000,wood:5900000,coal:1100000,iron:290000,fc:0,rfc:0,time:109680},
+ {id:'17',label:'Lv.17',meat:9300000,wood:9300000,coal:1800000,iron:460000,fc:0,rfc:0,time:131040},
+ {id:'18',label:'Lv.18',meat:12000000,wood:12000000,coal:2500000,iron:620000,fc:0,rfc:0,time:158340},
+ {id:'19',label:'Lv.19',meat:15000000,wood:15000000,coal:3100000,iron:780000,fc:0,rfc:0,time:239400},
+ {id:'20',label:'Lv.20',meat:21000000,wood:21000000,coal:4300000,iron:1000000,fc:0,rfc:0,time:295080},
+ {id:'21',label:'Lv.21',meat:27000000,wood:27000000,coal:5400000,iron:1300000,fc:0,rfc:0,time:383940},
+ {id:'22',label:'Lv.22',meat:36000000,wood:36000000,coal:7200000,iron:1800000,fc:0,rfc:0,time:576000},
+ {id:'23',label:'Lv.23',meat:44000000,wood:44000000,coal:8900000,iron:2200000,fc:0,rfc:0,time:811200},
+ {id:'24',label:'Lv.24',meat:60000000,wood:60000000,coal:12000000,iron:3000000,fc:0,rfc:0,time:1129980},
+ {id:'25',label:'Lv.25',meat:81000000,wood:81000000,coal:16000000,iron:4000000,fc:0,rfc:0,time:1592520},
+ {id:'26',label:'Lv.26',meat:100000000,wood:100000000,coal:21000000,iron:5200000,fc:0,rfc:0,time:1825560},
+ {id:'27',label:'Lv.27',meat:140000000,wood:140000000,coal:24000000,iron:7400000,fc:0,rfc:0,time:2192580},
+ {id:'28',label:'Lv.28',meat:190000000,wood:190000000,coal:39000000,iron:9900000,fc:0,rfc:0,time:2511720},
+ {id:'29',label:'Lv.29',meat:240000000,wood:240000000,coal:49000000,iron:12000000,fc:0,rfc:0,time:2893320},
+ {id:'30',label:'Lv.30',meat:300000000,wood:300000000,coal:60000000,iron:15000000,fc:0,rfc:0,time:3472020},
+ {id:'30-1',label:'Lv.30-1',meat:67000000,wood:67000000,coal:13000000,iron:3300000,fc:132,rfc:0,time:604800},
+ {id:'30-2',label:'Lv.30-2',meat:67000000,wood:67000000,coal:13000000,iron:3300000,fc:132,rfc:0,time:604800},
+ {id:'30-3',label:'Lv.30-3',meat:67000000,wood:67000000,coal:13000000,iron:3300000,fc:132,rfc:0,time:604800},
+ {id:'30-4',label:'Lv.30-4',meat:67000000,wood:67000000,coal:13000000,iron:3300000,fc:132,rfc:0,time:604800},
+ {id:'fc1',label:'FC 1',meat:67000000,wood:67000000,coal:13000000,iron:3300000,fc:132,rfc:0,time:604800},
+ {id:'fc1-1',label:'FC 1-1',meat:72000000,wood:72000000,coal:14000000,iron:3600000,fc:158,rfc:0,time:777600},
+ {id:'fc1-2',label:'FC 1-2',meat:72000000,wood:72000000,coal:14000000,iron:3600000,fc:158,rfc:0,time:777600},
+ {id:'fc1-3',label:'FC 1-3',meat:72000000,wood:72000000,coal:14000000,iron:3600000,fc:158,rfc:0,time:777600},
+ {id:'fc1-4',label:'FC 1-4',meat:72000000,wood:72000000,coal:14000000,iron:3600000,fc:158,rfc:0,time:777600},
+ {id:'fc2',label:'FC 2',meat:72000000,wood:72000000,coal:14000000,iron:3600000,fc:158,rfc:0,time:777600},
+ {id:'fc2-1',label:'FC 2-1',meat:79000000,wood:79000000,coal:15000000,iron:3900000,fc:238,rfc:0,time:950400},
+ {id:'fc2-2',label:'FC 2-2',meat:79000000,wood:79000000,coal:15000000,iron:3900000,fc:238,rfc:0,time:950400},
+ {id:'fc2-3',label:'FC 2-3',meat:79000000,wood:79000000,coal:15000000,iron:3900000,fc:238,rfc:0,time:950400},
+ {id:'fc2-4',label:'FC 2-4',meat:79000000,wood:79000000,coal:15000000,iron:3900000,fc:238,rfc:0,time:950400},
+ {id:'fc3',label:'FC 3',meat:79000000,wood:79000000,coal:15000000,iron:3900000,fc:238,rfc:0,time:950400},
+ {id:'fc3-1',label:'FC 3-1',meat:82000000,wood:82000000,coal:16000000,iron:4100000,fc:280,rfc:0,time:1036800},
+ {id:'fc3-2',label:'FC 3-2',meat:82000000,wood:82000000,coal:16000000,iron:4100000,fc:280,rfc:0,time:1036800},
+ {id:'fc3-3',label:'FC 3-3',meat:82000000,wood:82000000,coal:16000000,iron:4100000,fc:280,rfc:0,time:1036800},
+ {id:'fc3-4',label:'FC 3-4',meat:82000000,wood:82000000,coal:16000000,iron:4100000,fc:280,rfc:0,time:1036800},
+ {id:'fc4',label:'FC 4',meat:82000000,wood:82000000,coal:16000000,iron:4100000,fc:280,rfc:0,time:1036800},
+ {id:'fc4-1',label:'FC 4-1',meat:84000000,wood:84000000,coal:16000000,iron:4200000,fc:335,rfc:0,time:1209600},
+ {id:'fc4-2',label:'FC 4-2',meat:84000000,wood:84000000,coal:16000000,iron:4200000,fc:335,rfc:0,time:1209600},
+ {id:'fc4-3',label:'FC 4-3',meat:84000000,wood:84000000,coal:16000000,iron:4200000,fc:335,rfc:0,time:1209600},
+ {id:'fc4-4',label:'FC 4-4',meat:84000000,wood:84000000,coal:16000000,iron:4200000,fc:335,rfc:0,time:1209600},
+ {id:'fc5',label:'FC 5',meat:84000000,wood:84000000,coal:16000000,iron:4200000,fc:335,rfc:0,time:1209600},
+ {id:'fc5-1',label:'FC 5-1',meat:96000000,wood:96000000,coal:19000000,iron:4800000,fc:200,rfc:10,time:1296000},
+ {id:'fc5-2',label:'FC 5-2',meat:96000000,wood:96000000,coal:19000000,iron:4800000,fc:200,rfc:10,time:1296000},
+ {id:'fc5-3',label:'FC 5-3',meat:96000000,wood:96000000,coal:19000000,iron:4800000,fc:200,rfc:10,time:1296000},
+ {id:'fc5-4',label:'FC 5-4',meat:96000000,wood:96000000,coal:19000000,iron:4800000,fc:200,rfc:10,time:1296000},
+ {id:'fc6',label:'FC 6',meat:96000000,wood:96000000,coal:19000000,iron:4800000,fc:100,rfc:20,time:1296000},
+ {id:'fc6-1',label:'FC 6-1',meat:100000000,wood:100000000,coal:21000000,iron:5400000,fc:240,rfc:15,time:1555200},
+ {id:'fc6-2',label:'FC 6-2',meat:100000000,wood:100000000,coal:21000000,iron:5400000,fc:240,rfc:15,time:1555200},
+ {id:'fc6-3',label:'FC 6-3',meat:100000000,wood:100000000,coal:21000000,iron:5400000,fc:240,rfc:15,time:1555200},
+ {id:'fc6-4',label:'FC 6-4',meat:100000000,wood:100000000,coal:21000000,iron:5400000,fc:240,rfc:15,time:1555200},
+ {id:'fc7',label:'FC 7',meat:100000000,wood:100000000,coal:21000000,iron:5400000,fc:120,rfc:30,time:1555200},
+ {id:'fc7-1',label:'FC 7-1',meat:130000000,wood:130000000,coal:26000000,iron:6600000,fc:240,rfc:20,time:1728000},
+ {id:'fc7-2',label:'FC 7-2',meat:130000000,wood:130000000,coal:26000000,iron:6600000,fc:240,rfc:20,time:1728000},
+ {id:'fc7-3',label:'FC 7-3',meat:130000000,wood:130000000,coal:26000000,iron:6600000,fc:240,rfc:20,time:1728000},
+ {id:'fc7-4',label:'FC 7-4',meat:130000000,wood:130000000,coal:26000000,iron:6600000,fc:240,rfc:20,time:1728000},
+ {id:'fc8',label:'FC 8',meat:130000000,wood:130000000,coal:26000000,iron:6600000,fc:120,rfc:40,time:1728000},
+ {id:'fc8-1',label:'FC 8-1',meat:140000000,wood:140000000,coal:29000000,iron:7200000,fc:280,rfc:30,time:1123200},
+ {id:'fc8-2',label:'FC 8-2',meat:140000000,wood:140000000,coal:29000000,iron:7200000,fc:280,rfc:30,time:1123200},
+ {id:'fc8-3',label:'FC 8-3',meat:140000000,wood:140000000,coal:29000000,iron:7200000,fc:280,rfc:30,time:1123200},
+ {id:'fc8-4',label:'FC 8-4',meat:140000000,wood:140000000,coal:29000000,iron:7200000,fc:280,rfc:30,time:1123200},
+ {id:'fc9',label:'FC 9',meat:140000000,wood:140000000,coal:29000000,iron:7200000,fc:140,rfc:60,time:1123200},
+ {id:'fc9-1',label:'FC 9-1',meat:160000000,wood:160000000,coal:33000000,iron:8400000,fc:350,rfc:70,time:1728000},
+ {id:'fc9-2',label:'FC 9-2',meat:160000000,wood:160000000,coal:33000000,iron:8400000,fc:350,rfc:70,time:1728000},
+ {id:'fc9-3',label:'FC 9-3',meat:160000000,wood:160000000,coal:33000000,iron:8400000,fc:350,rfc:70,time:1728000},
+ {id:'fc9-4',label:'FC 9-4',meat:160000000,wood:160000000,coal:33000000,iron:8400000,fc:350,rfc:70,time:1728000},
+ {id:'fc10',label:'FC 10',meat:160000000,wood:160000000,coal:33000000,iron:8400000,fc:175,rfc:140,time:1728000}
+];
+
+const $=id=>document.getElementById(id);
+const fmt=n=>new Intl.NumberFormat('ko-KR').format(Math.round(n));
+const pct=n=>(n*100).toFixed(1).replace('.0','')+'%';
+function parseNum(v){
+  if(v==null||String(v).trim()==='') return 0;
+  let s=String(v).trim().toLowerCase().replaceAll(',','').replace(/\s+/g,'');
+  const korean=[['천만',1e7],['백만',1e6],['억',1e8],['만',1e4]];
+  for(const [u,m] of korean){ if(s.endsWith(u)) return parseFloat(s.slice(0,-u.length))*m; }
+  const m=s.match(/^(-?\d+(?:\.\d+)?)([kmb])?$/); if(!m) return Number(s)||0;
+  return parseFloat(m[1])*({k:1e3,m:1e6,b:1e9}[m[2]]||1);
+}
+function duration(sec){
+  sec=Math.max(0,Math.round(sec)); const d=Math.floor(sec/86400); sec%=86400; const h=Math.floor(sec/3600); sec%=3600; const m=Math.floor(sec/60); const s=sec%60;
+  const a=[]; if(d)a.push(d+'일'); if(h||d)a.push(h+'시간'); if(m||h||d)a.push(m+'분'); if(!a.length||s)a.push(s+'초'); return a.join(' ');
+}
+const ids=DATA.map(x=>x.id);
+const labels=Object.fromEntries(DATA.map(x=>[x.id,x.label]));
+const resourceDefs=[['🍖 고기','meat'],['🪵 나무','wood'],['🪨 석탄','coal'],['⛓️ 철','iron'],['🔷 불의 수정','fc'],['💠 정제 FC','rfc']];
+
+function fillSelects(){
+  for(const id of ['fromLevel','toLevel']) $(''+id).innerHTML=DATA.map(x=>`<option value="${x.id}">${x.label}</option>`).join('');
+  $('fromLevel').value='20'; $('toLevel').value='25';
+}
+function getInputs(){
+  const speed=(parseNum($('constructionSpeed').value)+parseNum($('extraBuild').value))/100;
+  return {
+    speed,
+    zin:Math.min(100,Math.max(0,parseNum($('zinman').value)))/100,
+    dt:Math.min(100,Math.max(0,parseNum($('doubleTime').value)))/100,
+    inv:{meat:parseNum($('meat').value),wood:parseNum($('wood').value),coal:parseNum($('coal').value),iron:parseNum($('iron').value),fc:parseNum($('fireCrystal').value),rfc:parseNum($('refinedFC').value)},
+    genMinutes:Math.max(0,parseNum($('generalSpeedup').value)),
+    conMinutes:Math.max(0,parseNum($('constructionSpeedup').value))
+  };
+}
+function calcRange(fi,ti, inputs){
+  const r={meat:0,wood:0,coal:0,iron:0,fc:0,rfc:0,time:0,effectiveTime:0}; const details=[]; let cum={meat:0,wood:0,coal:0,iron:0,fc:0,rfc:0,time:0,effectiveTime:0};
+  for(let i=fi+1;i<=ti;i++){
+    const d=DATA[i]; const effective=d.time/(1+inputs.speed)*(1-inputs.dt);
+    const item={...d,effective,meatAdj:d.meat*(1-inputs.zin),woodAdj:d.wood*(1-inputs.zin),coalAdj:d.coal*(1-inputs.zin),ironAdj:d.iron*(1-inputs.zin)};
+    r.meat+=item.meatAdj;r.wood+=item.woodAdj;r.coal+=item.coalAdj;r.iron+=item.ironAdj;r.fc+=d.fc;r.rfc+=d.rfc;r.time+=d.time;r.effectiveTime+=effective;
+    cum.meat+=item.meatAdj;cum.wood+=item.woodAdj;cum.coal+=item.coalAdj;cum.iron+=item.ironAdj;cum.fc+=d.fc;cum.rfc+=d.rfc;cum.time+=d.time;cum.effectiveTime+=effective;
+    details.push({...item,cum:{...cum}});
+  }
+  return {r,details};
+}
+function invEnough(req,inv){ return Object.keys(inv).every(k=>inv[k]>=req[k]); }
+function maxAffordable(fi,inputs){
+  let last=fi;
+  for(let i=fi+1;i<DATA.length;i++){ const res=calcRange(fi,i,inputs).r; if(invEnough(res,inputs.inv)) last=i; else break; }
+  return last;
+}
+function setText(id,v){ $(id).textContent=v; }
+function renderProgress(req,inv){
+  $('progressWrap').innerHTML=resourceDefs.map(([label,k])=>{
+    const need=req[k], own=inv[k], ratio=need?Math.min(1,own/need):1, enough=own>=need; const value=need?`${fmt(own)} / ${fmt(need)}`: `${fmt(own)} / 0`;
+    return `<div class="progress-row"><div class="progress-label">${label}</div><div class="progress-bar"><div class="progress-fill ${enough?'':'bad'}" style="width:${ratio*100}%"></div></div><div class="progress-value ${enough?'enough':'shortage'}">${value}</div></div>`;
+  }).join('');
+}
+function renderSpeedPlan(effectiveTime, inputs){
+  const available=inputs.genMinutes*60+inputs.conMinutes*60; const missing=Math.max(0,effectiveTime-available); const conUse=Math.min(effectiveTime,inputs.conMinutes*60); const afterCon=Math.max(0,effectiveTime-conUse); const genUse=Math.min(afterCon,inputs.genMinutes*60); const remain=Math.max(0,afterCon-genUse);
+  $('speedPlan').innerHTML=`
+    <div class="plan-item"><div class="subtle">건설 가속권 사용</div><div class="big">${duration(conUse)}</div></div>
+    <div class="plan-item"><div class="subtle">일반 가속권 사용</div><div class="big">${duration(genUse)}</div></div>
+    <div class="plan-item"><div class="subtle">가속권 사용 후 남는 시간</div><div class="big ${remain?'shortage':'enough'}">${duration(remain)}</div></div>
+    <div class="plan-item"><div class="subtle">추가로 필요한 가속</div><div class="big ${missing?'shortage':'enough'}">${duration(missing)}</div></div>`;
+}
+function renderTable(details, mode){
+  $('tableHead').innerHTML=mode==='detail' ? '<tr><th>업그레이드</th><th>기본 시간</th><th>버프 적용</th><th>고기</th><th>나무</th><th>석탄</th><th>철</th><th>FC</th><th>정제 FC</th></tr>' : '<tr><th>목표 레벨</th><th>누적 기본시간</th><th>누적 적용시간</th><th>누적 고기</th><th>누적 나무</th><th>누적 석탄</th><th>누적 철</th><th>누적 FC</th><th>누적 정제 FC</th></tr>';
+  $('detailTable').innerHTML=details.map(d=> mode==='detail'
+    ? `<tr><td>${d.label}</td><td>${duration(d.time)}</td><td>${duration(d.effective)}</td><td>${fmt(d.meatAdj)}</td><td>${fmt(d.woodAdj)}</td><td>${fmt(d.coalAdj)}</td><td>${fmt(d.ironAdj)}</td><td>${fmt(d.fc)}</td><td>${fmt(d.rfc)}</td></tr>`
+    : `<tr><td>${d.label}</td><td>${duration(d.cum.time)}</td><td>${duration(d.cum.effectiveTime)}</td><td>${fmt(d.cum.meat)}</td><td>${fmt(d.cum.wood)}</td><td>${fmt(d.cum.coal)}</td><td>${fmt(d.cum.iron)}</td><td>${fmt(d.cum.fc)}</td><td>${fmt(d.cum.rfc)}</td></tr>`).join('');
+}
+function persist(){ const ids=['fromLevel','toLevel','constructionSpeed','zinman','extraBuild','doubleTime','meat','wood','coal','iron','generalSpeedup','constructionSpeedup','fireCrystal','refinedFC']; localStorage.setItem('wosCalcV2',JSON.stringify(Object.fromEntries(ids.map(id=>[id,$(id).value])))); }
+function restore(){ try{ const d=JSON.parse(localStorage.getItem('wosCalcV2')||'{}'); for(const [k,v] of Object.entries(d)) if($(k)) $(k).value=v; }catch{} }
+function render(){
+  const fi=ids.indexOf($('fromLevel').value), ti=ids.indexOf($('toLevel').value); if(fi<0||ti<=fi){setText('headline','목표 레벨을 현재보다 높게 선택해주세요.');return;}
+  const inputs=getInputs(); const range=calcRange(fi,ti,inputs); const reachable=maxAffordable(fi,inputs); const effective=range.r.effectiveTime; const available=(inputs.genMinutes+inputs.conMinutes)*60; const extra=Math.max(0,effective-available); const enough=invEnough(range.r,inputs.inv);
+  setText('totalTime',duration(range.r.time)); setText('effectiveTime',duration(effective)); setText('speedNeed',duration(extra)); setText('maxReach',labels[DATA[reachable].id]);
+  setText('headline',`${labels[DATA[fi].id]} → ${labels[DATA[ti].id]} · ${range.details.length}단계`);
+  const inventoryNote=hasInventory?'입력한 자원을 모두 사용한다고 가정':'보유 자원을 입력하면 최대 도달 레벨이 계산됩니다';
+  setText('summary',`건설속도 ${pct(inputs.speed)} 적용 · 자원 절감 ${pct(inputs.zin)} · 추가 시간 감소 ${pct(inputs.dt)} · 가속권 가용 ${duration(available)} · ${inventoryNote}`);
+  $('resultBadge').textContent=enough?'목표 달성 가능':'자원 부족'; $('resultBadge').style.color=enough?'var(--good)':'var(--bad)'; $('resultBadge').style.borderColor=enough?'rgba(104,224,176,.28)':'rgba(255,119,119,.28)';
+  $('maxMetric').classList.toggle('good', reachable>=ti); $('maxMetric').classList.toggle('bad', reachable<ti);
+  const hasInventory=Object.values(inputs.inv).some(v=>v>0);
+  setText('reachCurrent',labels[DATA[fi].id]); setText('reachTarget',hasInventory?labels[DATA[reachable].id]:'자원 미입력');
+  renderProgress(range.r,inputs.inv); renderSpeedPlan(effective,inputs); renderTable(range.details,document.querySelector('.tab.active').dataset.tab); persist();
+}
+
+$('calc').addEventListener('click',render);
+['fromLevel','toLevel','constructionSpeed','zinman','extraBuild','doubleTime','meat','wood','coal','iron','generalSpeedup','constructionSpeedup','fireCrystal','refinedFC'].forEach(id=>$(id).addEventListener('input',()=>persist()));
+$('preset1').addEventListener('click',()=>{ $('meat').value='1.5b';$('wood').value='2b';$('coal').value='850m';$('iron').value='4300000';$('generalSpeedup').value='2500';$('constructionSpeedup').value='1200';$('fireCrystal').value='300';$('refinedFC').value='50';render(); });
+$('clearResources').addEventListener('click',()=>{ ['meat','wood','coal','iron','generalSpeedup','constructionSpeedup','fireCrystal','refinedFC'].forEach(id=>$(id).value='');render(); });
+$('reset').addEventListener('click',()=>{localStorage.removeItem('wosCalcV2');location.reload()});
+$('copy').addEventListener('click',async()=>{ const txt=`화이트아웃 서바이벌 건물 계산기\n${document.getElementById('headline').textContent}\n총 기본 건설시간: ${document.getElementById('totalTime').textContent}\n버프 적용 후: ${document.getElementById('effectiveTime').textContent}\n필요 가속시간: ${document.getElementById('speedNeed').textContent}\n자원 기준 가능 레벨: ${document.getElementById('maxReach').textContent}`; try{await navigator.clipboard.writeText(txt);$('copy').textContent='복사 완료 ✓';setTimeout(()=>$('copy').textContent='결과 복사',1200)}catch{alert(txt)} });
+document.querySelectorAll('.chip').forEach(b=>b.addEventListener('click',()=>{const [f,t]=b.dataset.range.split('-');$('fromLevel').value=f;$('toLevel').value=t;render();}));
+document.querySelectorAll('.tab').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));b.classList.add('active');render();}));
+fillSelects(); restore(); render();
+</script>
+</body></html>
