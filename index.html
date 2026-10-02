@@ -521,4 +521,231 @@ $('ocrAnalyze').addEventListener('click',async()=>{try{await analyzeSpeedupScree
 try{const saved=JSON.parse(localStorage.getItem('wosSpeedupInventoryV8')||'[]');if(Array.isArray(saved)&&saved.length){ocrRows=saved;renderOCRRows();}}catch{}updateOCRButtons();
 </script>
 
+
+<style>
+.ocr-status.busy{color:#ffd76b}
+.ocr-status.error{color:#ff8a8a}
+.ocr-progress{height:6px;border-radius:99px;background:rgba(255,255,255,.08);overflow:hidden;margin-top:8px;display:none}
+.ocr-progress>i{display:block;height:100%;width:0;background:linear-gradient(90deg,#6ee7ff,#52e7aa);transition:width .18s ease}
+.ocr-runtime-note{margin-top:8px;font-size:10px;color:#a9bbd6;line-height:1.5}
+</style>
+<script>
+// ================= V1.0 OCR engine / performance patch =================
+// Replaces the previous "many OCR passes per card" pipeline with:
+// 1) dynamic card detection using larger edge dilation,
+// 2) one mixed Korean+English Tesseract worker,
+// 3) one count OCR + one duration OCR per card (fallback only when needed),
+// 4) immediate status/progress feedback,
+// 5) visible error reporting instead of a silent-looking button.
+(function(){
+  const panel=document.getElementById('ocrPanel');
+  if(!panel) return;
+  const note=document.createElement('div');
+  note.className='ocr-runtime-note';
+  note.textContent='V1.0 빠른 분석 엔진 · 카드 수를 미리 정하지 않고 전체 이미지를 탐색합니다.';
+  const results=panel.querySelector('.ocr-results');
+  if(results) panel.insertBefore(note,results);
+  const toolbar=panel.querySelector('.ocr-toolbar');
+  if(toolbar){
+    const prog=document.createElement('div');
+    prog.className='ocr-progress'; prog.id='ocrProgress'; prog.innerHTML='<i></i>';
+    toolbar.after(prog);
+  }
+
+  // Remove the old analyze button listeners so the old long-running pipeline is never called.
+  const oldBtn=document.getElementById('ocrAnalyze');
+  if(!oldBtn) return;
+  const analyzeBtn=oldBtn.cloneNode(true);
+  oldBtn.replaceWith(analyzeBtn);
+
+  ocrWorkers={mixed:null};
+  let workerLoading=false;
+
+  function setStatus2(text,type){
+    const e=document.getElementById('ocrStatus'); if(!e)return;
+    e.textContent=text; e.classList.remove('busy','error'); if(type)e.classList.add(type);
+  }
+  function setProgress2(p){
+    const box=document.getElementById('ocrProgress'),bar=box?.querySelector('i');
+    if(!box||!bar)return; box.style.display=p==null?'none':'block'; bar.style.width=Math.max(0,Math.min(100,p||0))+'%';
+  }
+
+  async function getMixedWorker(){
+    if(ocrWorkers.mixed)return ocrWorkers.mixed;
+    if(workerLoading){ while(workerLoading&&!ocrWorkers.mixed) await new Promise(r=>setTimeout(r,80)); if(ocrWorkers.mixed)return ocrWorkers.mixed; }
+    workerLoading=true;
+    try{
+      const T=await loadTesseract();
+      setStatus2('OCR 엔진 준비 중…','busy');
+      ocrWorkers.mixed=await T.createWorker(['eng','kor'],1,{logger:m=>{
+        if(m?.status && m.progress!=null && ocrBusy){
+          setStatus2(`OCR 엔진 · ${m.status} ${Math.round(m.progress*100)}%`,'busy');
+        }
+      }});
+      return ocrWorkers.mixed;
+    }finally{workerLoading=false;}
+  }
+
+  function fastGray(src){
+    const ctx=src.getContext('2d'),d=ctx.getImageData(0,0,src.width,src.height).data;
+    const g=new Uint8Array(src.width*src.height);
+    for(let i=0,j=0;i<d.length;i+=4,j++) g[j]=Math.round(.299*d[i]+.587*d[i+1]+.114*d[i+2]);
+    return g;
+  }
+  function dilateBinary(edge,w,h,r=3){
+    const n=w*h, tmp=new Uint8Array(n), out=new Uint8Array(n);
+    // horizontal max filter
+    for(let y=0;y<h;y++){
+      const base=y*w; let run=0;
+      for(let x=0;x<w;x++){
+        if(edge[base+x])run=r+1; else if(run>0)run--; if(run>0)tmp[base+x]=1;
+      }
+      run=0; for(let x=w-1;x>=0;x--){if(edge[base+x])run=r+1; else if(run>0)run--; if(run>0)tmp[base+x]=1;}
+    }
+    // vertical max filter
+    for(let x=0;x<w;x++){
+      let run=0; for(let y=0;y<h;y++){const i=y*w+x;if(tmp[i])run=r+1; else if(run>0)run--; if(run>0)out[i]=1;}
+      run=0; for(let y=h-1;y>=0;y--){const i=y*w+x;if(tmp[i])run=r+1; else if(run>0)run--; if(run>0)out[i]=1;}
+    }
+    return out;
+  }
+  function detectCardBoxesFast(src){
+    const maxW=1200, scale=Math.min(1,maxW/src.width), w=Math.max(1,Math.round(src.width*scale)), h=Math.max(1,Math.round(src.height*scale));
+    const c=document.createElement('canvas'); c.width=w;c.height=h;c.getContext('2d').drawImage(src,0,0,w,h);
+    const g=fastGray(c), edge=new Uint8Array(w*h);
+    for(let y=1;y<h-1;y++){
+      const row=y*w;
+      for(let x=1;x<w-1;x++){
+        const i=row+x;
+        const dx=Math.abs(g[i+1]-g[i-1]);
+        const dy=Math.abs(g[i+w]-g[i-w]);
+        edge[i]=(dx+dy>58)?1:0;
+      }
+    }
+    const thick=dilateBinary(edge,w,h,3);
+    const seen=new Uint8Array(w*h), boxes=[];
+    const q=new Int32Array(Math.max(100000,Math.min(w*h,4500000)));
+    const minCardW=w*.09,maxCardW=w*.28,minCardH=Math.max(90,h*.055),maxCardH=Math.min(h*.20,w*.28);
+    for(let sy=0;sy<h;sy++){
+      for(let sx=0;sx<w;sx++){
+        const start=sy*w+sx;
+        if(!thick[start]||seen[start])continue;
+        let head=0,tail=0,minx=sx,maxx=sx,miny=sy,maxy=sy,count=0;
+        q[tail++]=start; seen[start]=1;
+        while(head<tail){
+          const v=q[head++], y=(v/w)|0, x=v-y*w; count++;
+          if(x<minx)minx=x;if(x>maxx)maxx=x;if(y<miny)miny=y;if(y>maxy)maxy=y;
+          for(let yy=-1;yy<=1;yy++)for(let xx=-1;xx<=1;xx++){
+            const nx=x+xx,ny=y+yy;if(nx<0||ny<0||nx>=w||ny>=h)continue;const ni=ny*w+nx;
+            if(thick[ni]&&!seen[ni]){seen[ni]=1;if(tail<q.length)q[tail++]=ni;}
+          }
+        }
+        const bw=maxx-minx+1,bh=maxy-miny+1,asp=bw/bh,area=bw*bh;
+        if(bw>=minCardW&&bw<=maxCardW&&bh>=minCardH&&bh<=maxCardH&&asp>.72&&asp<1.32&&count>Math.max(250,area*.035)){
+          boxes.push({x:Math.round(minx/scale),y:Math.round(miny/scale),w:Math.round(bw/scale),h:Math.round(bh/scale)});
+        }
+      }
+    }
+    return uniqueBoxes(boxes);
+  }
+
+  function parseDurationText(txt){
+    const t=String(txt||'').replace(/\s+/g,'');
+    const known=[['24시간',1440],['8시간',480],['3시간',180],['1시간',60],['30분',30],['15분',15],['10분',10],['5분',5],['1분',1]];
+    for(const [lab,min] of known) if(t.includes(lab)) return {label:lab,minutes:min,confidence:.92};
+    const m=t.match(/(\d{1,2})(시간|분)/); if(m){const n=Number(m[1]),unit=m[2];const min=unit==='시간'?n*60:n;const valid=known.find(x=>x[1]===min);if(valid)return{label:valid[0],minutes:min,confidence:.72};}
+    return {label:'__unknown__',minutes:0,confidence:.12};
+  }
+  function parseCountText(txt){
+    const clean=normalizeNumText(txt); if(!clean)return null; const n=Number(clean); return Number.isSafeInteger(n)&&n>=0&&n<=9999999?n:null;
+  }
+  async function recognizeCountFast(worker,card){
+    await worker.setParameters({tessedit_char_whitelist:'0123456789,',tessedit_pageseg_mode:'7'});
+    const h=card.height,w=card.width;
+    const crops=[
+      makeCanvas(card,w*.50,h*.70,w*.47,h*.25,5),
+      makeCanvas(card,w*.56,h*.73,w*.41,h*.20,6)
+    ];
+    const vals=[];
+    for(const c of crops){
+      const p=thresholdCanvas(c,175);
+      try{const r=await worker.recognize(p);const n=parseCountText(r.data?.text||'');if(n!==null)vals.push({n,conf:Number(r.data?.confidence||0)});}catch{}
+      if(vals.length&&vals[0].conf>=65)break;
+    }
+    if(!vals.length)return {count:0,confidence:.1,rawCount:''};
+    const map=new Map(); for(const v of vals){const x=map.get(v.n)||{n:v.n,v:0,conf:0};x.v++;x.conf=Math.max(x.conf,v.conf);map.set(v.n,x);} const best=[...map.values()].sort((a,b)=>b.v-a.v||b.conf-a.conf)[0];
+    return {count:best.n,confidence:Math.max(.25,Math.min(.98,(best.conf/100)*.8+(best.v/vals.length)*.2)),rawCount:String(best.n)};
+  }
+  async function recognizeDurationFast(worker,card){
+    await worker.setParameters({tessedit_char_whitelist:'',tessedit_pageseg_mode:'7'});
+    const h=card.height,w=card.width;
+    const c=makeCanvas(card,w*.12,h*.01,w*.80,h*.29,6);
+    const variants=[thresholdCanvas(c,175),thresholdCanvas(c,205)];
+    let best={label:'__unknown__',minutes:0,confidence:.12,rawDuration:''};
+    for(const p of variants){
+      try{const r=await worker.recognize(p);const txt=r.data?.text||'';const d=parseDurationText(txt);d.rawDuration=txt;if(d.confidence>best.confidence)best=d;if(d.minutes>0&&d.confidence>=.7)break;}catch{}
+    }
+    return best;
+  }
+  async function analyzeOneFast(src,fileName,index){
+    const boxes=detectCardBoxesFast(src); if(!boxes.length)return{rows:[],detected:0,boxes:[]};
+    const worker=await getMixedWorker(); const rows=[];
+    for(let i=0;i<boxes.length;i++){
+      const b=boxes[i];
+      setOCRStatus(`이미지 ${index+1} · 카드 ${i+1}/${boxes.length} 분석 중…`,'busy');
+      setProgress2(((i)/Math.max(1,boxes.length))*100);
+      const tile=makeCanvas(src,Math.max(0,b.x-2),Math.max(0,b.y-2),Math.min(src.width-Math.max(0,b.x-2),b.w+4),Math.min(src.height-Math.max(0,b.y-2),b.h+4),1);
+      let cnt,dur,cat;
+      try{
+        cnt=await recognizeCountFast(worker,tile);
+        dur=await recognizeDurationFast(worker,tile);
+        cat=await classifyCategory(tile);
+      }catch(e){
+        cnt={count:0,confidence:.1,rawCount:''};dur={label:'__unknown__',minutes:0,confidence:.1,rawDuration:''};cat={cat:'unknown',confidence:.1};
+      }
+      const conf=.40*dur.confidence+.45*cnt.confidence+.15*cat.confidence;
+      rows.push({cat:cat.cat,label:dur.label,minutes:dur.minutes,count:cnt.count,confidence:Math.max(.05,Math.min(.99,conf)),source:fileName,rawCount:cnt.rawCount||'',rawDuration:dur.rawDuration||'',box:b});
+    }
+    setProgress2(100); return{rows,detected:boxes.length,boxes};
+  }
+
+  async function analyzeV10(){
+    if(!ocrFiles.length||ocrBusy)return;
+    ocrBusy=true; updateOCRButtons(); ocrRows=[]; renderOCRRows(); setProgress2(0); setStatus2('분석 시작…','busy');
+    try{
+      // Preflight the CDN explicitly so a blocked/failed CDN never looks like a dead button.
+      setStatus2('OCR 엔진 불러오는 중…','busy');
+      await loadTesseract();
+      const files=ocrFiles.slice(); let detectedTotal=0; let firstSrc=null; let firstBoxes=[];
+      for(let fi=0;fi<files.length;fi++){
+        setStatus2(`${fi+1}/${files.length} 이미지 분석 준비…`,'busy');
+        const src=await loadImage(files[fi]); if(fi===0)firstSrc=src;
+        const result=await analyzeOneFast(src,files[fi].name,fi);
+        detectedTotal+=result.detected; ocrRows.push(...result.rows); if(fi===0)firstBoxes=result.boxes||[];
+      }
+      const map=new Map(),unresolved=[];
+      for(const r of ocrRows){
+        if(r.cat==='unknown'||r.label==='__unknown__'||r.minutes<=0||r.count<=0){unresolved.push(r);continue;}
+        const k=r.cat+'|'+r.label, old=map.get(k); if(old){old.count+=r.count;old.confidence=Math.min(old.confidence,r.confidence);} else map.set(k,{...r});
+      }
+      ocrRows=[...map.values(),...unresolved].sort((a,b)=>SPEEDUP_CATS.findIndex(x=>x[0]===a.cat)-SPEEDUP_CATS.findIndex(x=>x[0]===b.cat)||(a.minutes||999999)-(b.minutes||999999));
+      const usable=ocrRows.filter(r=>r.minutes>0&&r.count>0).length, unresolvedCount=ocrRows.length-usable;
+      setStatus2(`완료 · ${detectedTotal}개 카드 탐지 · ${usable}개 인식 · ${unresolvedCount}개 확인 필요`,'');
+      renderOCRRows(); if(document.getElementById('ocrDebug')?.checked&&firstSrc)drawDebug(firstSrc,firstBoxes,ocrRows);
+    }catch(err){
+      console.error(err); setStatus2('분석 실패 · 아래 오류를 확인하세요','error');
+      const panel=document.getElementById('ocrPanel'); if(panel){let e=document.getElementById('ocrErrorBox');if(!e){e=document.createElement('div');e.id='ocrErrorBox';e.style.cssText='margin-top:9px;padding:9px 10px;border-radius:11px;background:rgba(255,80,80,.08);border:1px solid rgba(255,120,120,.28);color:#ffd2d2;font-size:10px;line-height:1.5;';panel.appendChild(e);}e.textContent='오류: '+(err?.message||String(err));}
+    }finally{ocrBusy=false;updateOCRButtons();}
+  }
+
+  analyzeBtn.addEventListener('click',analyzeV10);
+
+  // Replace the clear/apply handlers too, so they stay consistent with the new button lifecycle.
+  const clearBtn=document.getElementById('ocrClear'); if(clearBtn){const n=clearBtn.cloneNode(true);clearBtn.replaceWith(n);n.addEventListener('click',clearOCR);}
+  const applyBtn=document.getElementById('ocrApply'); if(applyBtn){const n=applyBtn.cloneNode(true);applyBtn.replaceWith(n);n.addEventListener('click',applyOCRToCalculator);}
+
+  // updateOCRButtons now sees the new analyze button by id; no further changes required.
+})();
+</script>
+
 </body></html>
